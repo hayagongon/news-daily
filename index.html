@@ -376,6 +376,13 @@ body {
   margin-top: 6px; text-align: right;
 }
 
+/* ===== AI コスト表示 ===== */
+.cost-badge {
+  font-size: 12px; color: var(--text-muted);
+  background: var(--chip-bg); border-radius: 8px;
+  padding: 8px 12px; line-height: 1.7; width: 100%;
+}
+
 /* ===== トースト ===== */
 .toast {
   position: fixed; bottom: 28px; left: 50%;
@@ -507,6 +514,19 @@ body {
                 placeholder="相撲&#10;日経平均が&#10;日経平均続&#10;円安が進&#10;（1行に1キーワード）"></textarea>
       <div class="kw-count" id="kwCount"></div>
       <button class="btn-save-kw" onclick="saveKeywords()">キーワードを保存して適用</button>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-label">🤖 AIフィルタールール</div>
+      <div class="settings-desc">
+        Claude AI がルールを読み取り、毎晩の記事取得時に高度な除外判定を行います。<br>
+        変更後は翌晩の取得から反映されます（キーワード除外より正確な判定が可能です）。
+      </div>
+      <textarea class="kw-textarea" id="aiRulesTextarea" style="min-height:200px"
+                placeholder="PATを設定するとルールを読み書きできます&#10;（ルールはGitHubに保存されます）"></textarea>
+      <div class="kw-count" id="aiRulesStatus"></div>
+      <button class="btn-save-kw" onclick="saveAiRules()">ルールを保存（GitHub）</button>
+      <div class="cost-badge" id="aiCostBadge" style="margin-top:10px;display:none"></div>
     </div>
   </div>
 </div>
@@ -534,12 +554,92 @@ const CAT_COLOR = {
 const CAT_SHORT = { "芸能・エンタメ・ゴシップ": "芸能" };
 
 // ===== 状態 =====
-let allArticles    = [];
-let deletedIds     = new Set();
-let selectedIds    = new Set();
-let activeCat      = "全て";
-let activeDate     = "全て";
+let allArticles     = [];
+let deletedIds      = new Set();
+let aiExcludedIds   = new Set();   // AI フィルタリングで除外された記事ID
+let selectedIds     = new Set();
+let activeCat       = "全て";
+let activeDate      = "全て";
 let excludeKeywords = [];   // 除外キーワードリスト
+
+// ===== AI 除外ID 読み込み =====
+async function loadAiExcluded() {
+  try {
+    const res = await fetch(`./ai-excluded-ids.json?t=${Date.now()}`);
+    if (!res.ok) return [];
+    const ids = await res.json();
+    return Array.isArray(ids) ? ids : [];
+  } catch { return []; }
+}
+
+// ===== AI フィルタールール 読み込み =====
+async function loadAiRules() {
+  const textarea = document.getElementById("aiRulesTextarea");
+  const status   = document.getElementById("aiRulesStatus");
+  textarea.value = "読み込み中...";
+  status.textContent = "";
+  try {
+    const { ok, data } = await ghContents("filter-rules.txt");
+    if (ok && data && data.content) {
+      textarea.value     = atob(data.content.replace(/\n/g, ""));
+      status.textContent = "✅ GitHubから読み込みました";
+    } else {
+      textarea.value     = "";
+      status.textContent = "⚠️ PATを設定するとルールを読み書きできます";
+    }
+  } catch {
+    textarea.value     = "";
+    status.textContent = "⚠️ 読み込みに失敗しました";
+  }
+}
+
+// ===== AI フィルタールール 保存 =====
+async function saveAiRules() {
+  if (!PAT.get()) { showToast("PATを設定してください"); return; }
+  const content = document.getElementById("aiRulesTextarea").value;
+  const status  = document.getElementById("aiRulesStatus");
+  status.textContent = "保存中...";
+  try {
+    const { ok: getOk, data } = await ghContents("filter-rules.txt");
+    const sha = (getOk && data && data.sha) ? data.sha : undefined;
+    const { ok } = await ghPut(
+      "filter-rules.txt", content, sha, "📋 filter-rules.txt 更新"
+    );
+    if (ok) {
+      status.textContent = "✅ GitHubに保存しました（翌晩の取得から反映）";
+      showToast("ルールを保存しました");
+    } else {
+      status.textContent = "❌ 保存に失敗しました";
+      showToast("保存に失敗しました");
+    }
+  } catch (e) {
+    status.textContent = `❌ エラー: ${e.message}`;
+    showToast("保存に失敗しました");
+  }
+}
+
+// ===== API 使用量表示 =====
+async function loadApiUsage() {
+  const badge = document.getElementById("aiCostBadge");
+  try {
+    const res = await fetch(`./api-usage.json?t=${Date.now()}`);
+    if (!res.ok) { badge.style.display = "none"; return; }
+    const usage = await res.json();
+    if (!usage || usage.costJpy === undefined) { badge.style.display = "none"; return; }
+    const month = usage.month || "";
+    const jpy   = usage.costJpy || 0;
+    const usd   = (usage.costUsd || 0).toFixed(4);
+    const inTok = (usage.inputTokens  || 0).toLocaleString("ja-JP");
+    const outTok= (usage.outputTokens || 0).toLocaleString("ja-JP");
+    const last  = usage.lastRun ? `<br>最終実行: ${usage.lastRun} (JST)` : "";
+    badge.style.display = "block";
+    badge.innerHTML =
+      `💰 今月(${month}) Claude AI: <strong>¥${jpy}</strong> ($${usd})<br>` +
+      `トークン: 入力 ${inTok} / 出力 ${outTok}${last}`;
+  } catch {
+    badge.style.display = "none";
+  }
+}
 
 // ===== 除外キーワード管理 =====
 function loadKeywords() {
@@ -646,12 +746,14 @@ async function init() {
   document.getElementById("mainContent").style.display  = "none";
 
   try {
-    const [articles, remote] = await Promise.all([
+    const [articles, remote, aiExcluded] = await Promise.all([
       fetchArticles(),
       loadRemoteDeleted(),
+      loadAiExcluded(),
     ]);
 
-    allArticles = Array.isArray(articles) ? articles : [];
+    allArticles   = Array.isArray(articles) ? articles : [];
+    aiExcludedIds = new Set(aiExcluded);
 
     // ローカル + リモートの削除IDをマージ
     const local = loadLocalDeleted();
@@ -673,7 +775,8 @@ async function init() {
 // ===== フィルター =====
 function getFiltered() {
   return allArticles.filter(a => {
-    if (deletedIds.has(a.id)) return false;
+    if (deletedIds.has(a.id))    return false;
+    if (aiExcludedIds.has(a.id)) return false;  // AI フィルタリング除外
     if (activeCat  !== "全て" && a.cat  !== activeCat) return false;
     if (activeDate !== "全て" && a.date !== activeDate) return false;
     // 除外キーワード（タイトルのみを対象にする）
@@ -862,6 +965,9 @@ function openSettings() {
   updateKwCount();
   document.getElementById("settingsBackdrop").classList.add("open");
   document.body.style.overflow = "hidden";
+  // AI ルールと使用量を非同期で読み込む
+  loadAiRules();
+  loadApiUsage();
 }
 function closeSettings()            { document.getElementById("settingsBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
 function closeSettingsOnBackdrop(e) { if (e.target === document.getElementById("settingsBackdrop")) closeSettings(); }
