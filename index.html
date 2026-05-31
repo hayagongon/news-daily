@@ -687,7 +687,7 @@ async function ghPut(path, content, sha, message) {
     Authorization: `Bearer ${pat}`,
     "Content-Type": "application/json",
   };
-  const body = { message, content: btoa(content), branch: BRANCH };
+  const body = { message, content: btoa(unescape(encodeURIComponent(content))), branch: BRANCH };
   if (sha) body.sha = sha;
   const res = await fetch(`${API_BASE}/${path}`, {
     method: "PUT", headers, body: JSON.stringify(body),
