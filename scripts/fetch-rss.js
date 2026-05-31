@@ -28,15 +28,15 @@ const PRICE_OUTPUT_PER_MTOK = 4.00;  // USD per 1M output tokens
 const JPY_PER_USD           = 155;   // 概算レート
 
 // ===== RSS ソース一覧 =====
-// NHK RSSカテゴリ対応: cat3=政治 cat4=経済 cat5=社会 cat6=国際 cat7=スポーツ cat8=科学・文化
+// NHK RSSカテゴリ対応: cat4=政治 cat5=経済 cat8=社会 cat6=国際 cat7=スポーツ cat3=科学・文化
 const SOURCES = [
   // NHK（カテゴリ別フィード）
-  { url: "https://www3.nhk.or.jp/rss/news/cat3.xml", cat: "政治",                   src: "NHK" },
-  { url: "https://www3.nhk.or.jp/rss/news/cat4.xml", cat: "経済",                   src: "NHK" },
-  { url: "https://www3.nhk.or.jp/rss/news/cat5.xml", cat: "社会",                   src: "NHK" },
+  { url: "https://www3.nhk.or.jp/rss/news/cat4.xml", cat: "政治",                   src: "NHK" },
+  { url: "https://www3.nhk.or.jp/rss/news/cat5.xml", cat: "経済",                   src: "NHK" },
+  { url: "https://www3.nhk.or.jp/rss/news/cat8.xml", cat: "社会",                   src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat6.xml", cat: "国際",                   src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat7.xml", cat: "スポーツ",               src: "NHK" },
-  { url: "https://www3.nhk.or.jp/rss/news/cat8.xml", cat: "テクノロジー",            src: "NHK科学" },
+  { url: "https://www3.nhk.or.jp/rss/news/cat3.xml", cat: "テクノロジー",            src: "NHK科学" },
   // ITmedia（テクノロジー）
   { url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml", cat: "テクノロジー",  src: "ITmedia" },
   // natalie（芸能・エンタメ）
