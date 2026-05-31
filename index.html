@@ -133,6 +133,49 @@ body {
 }
 .date-select:focus { border-color: var(--sel-border); }
 
+/* ===== 検索・並べ替えバー ===== */
+.search-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px 8px; border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.search-select {
+  padding: 5px 8px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-primary);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  font-family: inherit; flex-shrink: 0; outline: none;
+  min-width: 56px;
+}
+.search-select:focus { border-color: var(--sel-border); }
+.search-input {
+  flex: 1; min-width: 100px;
+  padding: 5px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-primary);
+  font-size: 12.5px; font-family: inherit; outline: none;
+}
+.search-input:focus { border-color: var(--sel-border); }
+.search-input::placeholder { color: var(--text-muted); }
+.sort-btn {
+  padding: 5px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-primary);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit; flex-shrink: 0; white-space: nowrap;
+}
+.sort-btn:hover { background: var(--chip-bg); }
+.reset-btn {
+  padding: 5px 8px; border-radius: 8px;
+  border: none; background: none; cursor: pointer;
+  font-size: 13px; color: var(--text-muted); font-family: inherit; flex-shrink: 0;
+}
+.reset-btn:hover { color: var(--text-primary); }
+.count-badge {
+  font-size: 11.5px; color: var(--text-muted);
+  flex-shrink: 0; white-space: nowrap; margin-left: auto;
+}
+
 /* ===== ローディング ===== */
 .loading-state {
   display: flex; flex-direction: column; align-items: center;
@@ -458,10 +501,19 @@ body {
     <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')"><span class="chip-dot" style="background:#16a085"></span>スポーツ</button>
     <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')"><span class="chip-dot" style="background:#e91e8c"></span>芸能・エンタメ・ゴシップ</button>
     <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')"><span class="chip-dot" style="background:#2c3e50"></span>テクノロジー</button>
-    <div class="filter-sep"></div>
-    <select class="date-select" id="dateSelect" onchange="setDate(this.value)">
-      <option value="全て">全日付</option>
+  </div>
+  <div class="search-row" id="searchRow">
+    <select class="search-select" id="yearSelect" onchange="setYear(this.value)">
+      <option value="全て">年</option>
     </select>
+    <select class="search-select" id="monthSelect" onchange="setMonth(this.value)">
+      <option value="全て">月</option>
+    </select>
+    <input class="search-input" id="searchInput" type="text" placeholder="キーワード検索…"
+           oninput="setSearch(this.value)">
+    <button class="sort-btn" id="sortBtn" onclick="toggleSort()">↓ 新しい順</button>
+    <button class="reset-btn" id="resetBtn" onclick="resetFilters()" title="リセット">✕</button>
+    <span class="count-badge" id="countBadge"></span>
   </div>
 </div>
 
@@ -588,7 +640,10 @@ let deletedIds      = new Set();
 let aiExcludedIds   = new Set();   // AI フィルタリングで除外された記事ID
 let selectedIds     = new Set();
 let activeCat       = "全て";
-let activeDate      = "全て";
+let activeYear      = "全て";
+let activeMonth     = "全て";
+let searchQuery     = "";
+let sortOrder       = "desc";  // "desc"=新しい順 "asc"=古い順
 let excludeKeywords = [];   // 除外キーワードリスト
 
 // ===== AI 除外ID 読み込み =====
@@ -809,9 +864,19 @@ function getFiltered() {
   return allArticles.filter(a => {
     if (deletedIds.has(a.id))    return false;
     if (aiExcludedIds.has(a.id)) return false;  // AI フィルタリング除外
-    if (activeCat  !== "全て" && a.cat  !== activeCat) return false;
-    if (activeDate !== "全て" && a.date !== activeDate) return false;
-    // 除外キーワード（タイトルのみを対象にする）
+    if (activeCat !== "全て" && a.cat !== activeCat) return false;
+    // 年フィルター
+    if (activeYear !== "全て" && !a.date.startsWith(activeYear)) return false;
+    // 月フィルター ("MM" 形式)
+    if (activeMonth !== "全て" && a.date.slice(5, 7) !== activeMonth) return false;
+    // キーワード検索（タイトル＋説明文）
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const t = (a.title || "").toLowerCase();
+      const d = (a.desc  || "").toLowerCase();
+      if (!t.includes(q) && !d.includes(q)) return false;
+    }
+    // 除外キーワード（タイトルのみ）
     if (excludeKeywords.length > 0) {
       const title = (a.title || "").toLowerCase();
       if (excludeKeywords.some(kw => kw && title.includes(kw.toLowerCase()))) return false;
@@ -826,7 +891,25 @@ function getDeleted() {
 }
 
 function setCategory(cat) { activeCat = cat; selectedIds.clear(); render(); }
-function setDate(val)      { activeDate = val; selectedIds.clear(); render(); }
+function setYear(val)  { activeYear  = val; activeMonth = "全て"; selectedIds.clear(); render(); }
+function setMonth(val) { activeMonth = val; selectedIds.clear(); render(); }
+function setSearch(val){ searchQuery = val.trim(); render(); }
+function toggleSort() {
+  sortOrder = sortOrder === "desc" ? "asc" : "desc";
+  document.getElementById("sortBtn").textContent =
+    sortOrder === "desc" ? "↓ 新しい順" : "↑ 古い順";
+  renderCards();
+}
+function resetFilters() {
+  activeYear  = "全て";
+  activeMonth = "全て";
+  searchQuery = "";
+  sortOrder   = "desc";
+  document.getElementById("searchInput").value  = "";
+  document.getElementById("sortBtn").textContent = "↓ 新しい順";
+  selectedIds.clear();
+  render();
+}
 
 // ===== 選択 =====
 function toggleSelect(id, e) {
@@ -873,9 +956,17 @@ function updateHeader() {
   const filtered = getFiltered();
   const total    = filtered.length;
   const sel      = selectedIds.size;
+  const allTotal = allArticles.filter(a => !deletedIds.has(a.id) && !aiExcludedIds.has(a.id)).length;
 
-  document.getElementById("stats").textContent =
-    sel > 0 ? `${sel}件選択中 / ${total}件` : `${total}件`;
+  document.getElementById("stats").textContent = sel > 0 ? `${sel}件選択中` : "";
+
+  // カウントバッジ
+  const badge = document.getElementById("countBadge");
+  if (badge) {
+    const hasFilter = activeCat !== "全て" || activeYear !== "全て" ||
+                      activeMonth !== "全て" || searchQuery;
+    badge.textContent = hasFilter ? `${total}件 / 全${allTotal}件` : `${total}件`;
+  }
 
   const btnDel = document.getElementById("btnDelete");
   btnDel.disabled    = sel === 0;
@@ -889,19 +980,30 @@ function updateHeader() {
   });
 }
 
-// ===== 日付セレクト更新 =====
-function updateDateSelect() {
-  const sel   = document.getElementById("dateSelect");
-  const dates = [...new Set(
-    allArticles.filter(a => !deletedIds.has(a.id)).map(a => a.date)
-  )].sort((a, b) => b.localeCompare(a));
+// ===== 年・月セレクト更新 =====
+function updateYearMonthSelects() {
+  const dates = allArticles
+    .filter(a => !deletedIds.has(a.id) && !aiExcludedIds.has(a.id))
+    .map(a => a.date);
 
-  sel.innerHTML = `<option value="全て">全日付</option>` +
-    dates.map(d =>
-      `<option value="${d}"${d === activeDate ? " selected" : ""}>${toDateLabel(d)}</option>`
+  // 年リスト（降順）
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+  const yearSel = document.getElementById("yearSelect");
+  yearSel.innerHTML = `<option value="全て">年</option>` +
+    years.map(y =>
+      `<option value="${y}"${y === activeYear ? " selected" : ""}>${y}年</option>`
     ).join("");
+  if (!years.includes(activeYear)) activeYear = "全て";
 
-  if (!dates.includes(activeDate)) activeDate = "全て";
+  // 月リスト — 選択中の年でフィルター（降順）
+  const filtered = activeYear === "全て" ? dates : dates.filter(d => d.startsWith(activeYear));
+  const months = [...new Set(filtered.map(d => d.slice(5, 7)))].sort((a, b) => b.localeCompare(a));
+  const monthSel = document.getElementById("monthSelect");
+  monthSel.innerHTML = `<option value="全て">月</option>` +
+    months.map(m =>
+      `<option value="${m}"${m === activeMonth ? " selected" : ""}>${Number(m)}月</option>`
+    ).join("");
+  if (!months.includes(activeMonth)) activeMonth = "全て";
 }
 
 // ===== カード描画 =====
@@ -935,7 +1037,9 @@ function renderCards() {
       return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
     });
   });
-  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+  const sortedDates = Object.keys(byDate).sort((a, b) =>
+    sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b)
+  );
 
   list.innerHTML = sortedDates.map(date => {
     const cards = byDate[date].map(a => {
@@ -1049,7 +1153,7 @@ function clearPATUI() {
 
 // ===== 全体再描画 =====
 function render() {
-  updateDateSelect();
+  updateYearMonthSelects();
   renderCards();
   updateTrashFab();
   updateHeader();
