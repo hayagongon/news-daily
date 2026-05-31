@@ -28,15 +28,17 @@ const PRICE_OUTPUT_PER_MTOK = 4.00;  // USD per 1M output tokens
 const JPY_PER_USD           = 155;   // 概算レート
 
 // ===== RSS ソース一覧 =====
-// NHK RSSカテゴリ対応: cat4=政治 cat5=経済 cat8=社会 cat6=国際 cat7=スポーツ cat3=科学・文化
+// NHK RSSカテゴリ対応: cat4=政治 cat5=経済 cat6=国際 cat7=スポーツ cat3=科学・医療
+// ※ NHK cat8（社会）は2010年で更新停止の廃止フィードのため Yahoo 国内に差し替え
 const SOURCES = [
   // NHK（カテゴリ別フィード）
   { url: "https://www3.nhk.or.jp/rss/news/cat4.xml", cat: "政治",                   src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat5.xml", cat: "経済",                   src: "NHK" },
-  { url: "https://www3.nhk.or.jp/rss/news/cat8.xml", cat: "社会",                   src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat6.xml", cat: "国際",                   src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat7.xml", cat: "スポーツ",               src: "NHK" },
   { url: "https://www3.nhk.or.jp/rss/news/cat3.xml", cat: "テクノロジー",            src: "NHK科学" },
+  // Yahoo ニュース（社会）※ NHK に社会専用 RSS が存在しないため
+  { url: "https://news.yahoo.co.jp/rss/categories/domestic.xml", cat: "社会",       src: "Yahoo" },
   // ITmedia（テクノロジー）
   { url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml", cat: "テクノロジー",  src: "ITmedia" },
   // natalie（芸能・エンタメ）
