@@ -602,14 +602,15 @@ async function saveAiRules() {
   try {
     const { ok: getOk, data } = await ghContents("filter-rules.txt");
     const sha = (getOk && data && data.sha) ? data.sha : undefined;
-    const { ok } = await ghPut(
+    const { ok, data: putData } = await ghPut(
       "filter-rules.txt", content, sha, "📋 filter-rules.txt 更新"
     );
     if (ok) {
       status.textContent = "✅ GitHubに保存しました（翌晩の取得から反映）";
       showToast("ルールを保存しました");
     } else {
-      status.textContent = "❌ 保存に失敗しました";
+      const errMsg = putData?.message || "不明なエラー";
+      status.textContent = `❌ 失敗: ${errMsg}`;
       showToast("保存に失敗しました");
     }
   } catch (e) {
