@@ -581,7 +581,9 @@ async function loadAiRules() {
   try {
     const { ok, data } = await ghContents("filter-rules.txt");
     if (ok && data && data.content) {
-      textarea.value     = atob(data.content.replace(/\n/g, ""));
+      const raw   = atob(data.content.replace(/\n/g, ""));
+      const bytes = new Uint8Array(raw.split("").map(c => c.charCodeAt(0)));
+      textarea.value     = new TextDecoder("utf-8").decode(bytes);
       status.textContent = "✅ GitHubから読み込みました";
     } else {
       textarea.value     = "";
