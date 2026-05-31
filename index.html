@@ -349,6 +349,33 @@ body {
   padding: 10px 12px; margin-top: 16px; line-height: 1.7;
 }
 
+/* ===== 除外キーワード ===== */
+.settings-divider {
+  height: 1px; background: var(--border); margin: 20px 0;
+}
+.kw-textarea {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--surface2); color: var(--text-primary);
+  font-size: 13px; font-family: inherit; outline: none;
+  resize: vertical; min-height: 100px; line-height: 1.7;
+  transition: border-color 0.15s;
+}
+.kw-textarea:focus { border-color: var(--sel-border); }
+.kw-textarea::placeholder { color: var(--text-muted); }
+.btn-save-kw {
+  width: 100%; margin-top: 8px;
+  background: var(--chip-bg); color: var(--text-secondary);
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 9px 0; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-save-kw:hover { border-color: var(--sel-border); color: var(--sel-border); }
+.kw-count {
+  font-size: 11.5px; color: var(--text-muted);
+  margin-top: 6px; text-align: right;
+}
+
 /* ===== トースト ===== */
 .toast {
   position: fixed; bottom: 28px; left: 50%;
@@ -467,6 +494,18 @@ body {
         GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>
         → "news-daily" リポジトリを選択 → Contents: Read and Write → Generate
       </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-label">除外キーワード（1行1キーワード）</div>
+      <div class="settings-desc">
+        タイトルや説明文にこのキーワードが含まれる記事を<strong>非表示</strong>にします。<br>
+        大文字・小文字は区別しません。
+      </div>
+      <textarea class="kw-textarea" id="kwTextarea"
+                placeholder="相撲&#10;日経平均&#10;過去最高値&#10;（1行に1キーワード）"></textarea>
+      <div class="kw-count" id="kwCount"></div>
+      <button class="btn-save-kw" onclick="saveKeywords()">キーワードを保存して適用</button>
     </div>
   </div>
 </div>
@@ -494,11 +533,33 @@ const CAT_COLOR = {
 const CAT_SHORT = { "芸能・エンタメ・ゴシップ": "芸能" };
 
 // ===== 状態 =====
-let allArticles = [];
-let deletedIds  = new Set();
-let selectedIds = new Set();
-let activeCat   = "全て";
-let activeDate  = "全て";
+let allArticles    = [];
+let deletedIds     = new Set();
+let selectedIds    = new Set();
+let activeCat      = "全て";
+let activeDate     = "全て";
+let excludeKeywords = [];   // 除外キーワードリスト
+
+// ===== 除外キーワード管理 =====
+function loadKeywords() {
+  try { return JSON.parse(localStorage.getItem("excludeKeywords") || "[]"); }
+  catch { return []; }
+}
+function saveKeywords() {
+  const raw  = document.getElementById("kwTextarea").value;
+  const list = raw.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+  excludeKeywords = list;
+  localStorage.setItem("excludeKeywords", JSON.stringify(list));
+  updateKwCount();
+  selectedIds.clear();
+  render();
+  showToast(`除外キーワードを保存しました（${list.length}件）`);
+}
+function updateKwCount() {
+  const n = excludeKeywords.length;
+  document.getElementById("kwCount").textContent =
+    n > 0 ? `${n}件のキーワードが設定済み` : "";
+}
 
 // ===== PAT 管理 =====
 const PAT = {
@@ -610,11 +671,17 @@ async function init() {
 
 // ===== フィルター =====
 function getFiltered() {
-  return allArticles.filter(a =>
-    !deletedIds.has(a.id) &&
-    (activeCat  === "全て" || a.cat  === activeCat) &&
-    (activeDate === "全て" || a.date === activeDate)
-  );
+  return allArticles.filter(a => {
+    if (deletedIds.has(a.id)) return false;
+    if (activeCat  !== "全て" && a.cat  !== activeCat) return false;
+    if (activeDate !== "全て" && a.date !== activeDate) return false;
+    // 除外キーワード
+    if (excludeKeywords.length > 0) {
+      const text = ((a.title || "") + " " + (a.desc || "")).toLowerCase();
+      if (excludeKeywords.some(kw => text.includes(kw.toLowerCase()))) return false;
+    }
+    return true;
+  });
 }
 function getDeleted() {
   return allArticles
@@ -787,9 +854,11 @@ function closeTrashOnBackdrop(e) { if (e.target === document.getElementById("tra
 
 // ===== 設定モーダル =====
 function openSettings() {
-  const pat = PAT.get();
   document.getElementById("patInput").value = "";  // セキュリティ上、毎回空欄から
   updatePatStatus();
+  // 除外キーワードを textarea に反映
+  document.getElementById("kwTextarea").value = excludeKeywords.join("\n");
+  updateKwCount();
   document.getElementById("settingsBackdrop").classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -864,6 +933,7 @@ function showToast(msg) {
 }
 
 // ===== 起動 =====
+excludeKeywords = loadKeywords();  // 除外キーワードを復元
 init();
 </script>
 </body>
