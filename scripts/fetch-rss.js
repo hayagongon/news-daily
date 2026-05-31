@@ -74,31 +74,49 @@ function fetchUrl(url, redirects = 0) {
   });
 }
 
-// ===== RSS XML パーサー =====
+// ===== RSS / Atom XML パーサー =====
 function parseRSS(xml) {
   const items = [];
+
+  const getText = (block, tag) => {
+    let r = block.match(new RegExp(
+      `<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i"
+    ));
+    if (r) return r[1].trim();
+    r = block.match(new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`, "i"));
+    if (r) return r[1].trim();
+    return "";
+  };
+
+  // ===== RSS: <item>...</item> =====
   const itemRe = /<item>([\s\S]*?)<\/item>/g;
   let m;
   while ((m = itemRe.exec(xml)) !== null) {
-    const block = m[1];
-    const get = tag => {
-      let r = block.match(new RegExp(
-        `<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i"
-      ));
-      if (r) return r[1].trim();
-      r = block.match(new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`, "i"));
-      if (r) return r[1].trim();
-      return "";
-    };
-
-    const title   = get("title");
-    const link    = get("link") || get("guid");
-    const desc    = get("description");
-    const pubDate = get("pubDate") || get("dc:date") || get("published");
-
+    const block   = m[1];
+    const title   = getText(block, "title");
+    const link    = getText(block, "link") || getText(block, "guid");
+    const desc    = getText(block, "description");
+    const pubDate = getText(block, "pubDate") || getText(block, "dc:date") || getText(block, "published");
     if (!title || !link) continue;
     items.push({ title, link, desc, pubDate });
   }
+
+  // ===== Atom: <entry>...</entry>（RSS で0件のときのみ試みる）=====
+  if (items.length === 0) {
+    const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
+    while ((m = entryRe.exec(xml)) !== null) {
+      const block   = m[1];
+      const title   = getText(block, "title");
+      // Atom のリンクは属性: <link href="https://..." rel="alternate"/>
+      const linkAttr = block.match(/<link[^>]+href="([^"]+)"/i);
+      const link    = (linkAttr ? linkAttr[1] : "") || getText(block, "id");
+      const desc    = getText(block, "summary") || getText(block, "content");
+      const pubDate = getText(block, "published") || getText(block, "updated");
+      if (!title || !link) continue;
+      items.push({ title, link, desc, pubDate });
+    }
+  }
+
   return items;
 }
 
