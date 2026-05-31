@@ -162,7 +162,21 @@ body {
 }
 
 /* ===== メインコンテンツ ===== */
-.main { max-width: 760px; margin: 0 auto; padding: 10px 12px 100px; }
+.main { max-width: 1400px; margin: 0 auto; padding: 10px 12px 100px; }
+
+/* ===== カードグリッド（レスポンシブ列） ===== */
+.cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+@media (min-width: 760px) {
+  .cards-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 1200px) {
+  .cards-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
 
 /* ===== 日付グループヘッダー ===== */
 .date-header {
@@ -174,7 +188,7 @@ body {
 
 /* ===== カード ===== */
 .card {
-  background: var(--surface); border-radius: 12px; margin-bottom: 8px;
+  background: var(--surface); border-radius: 12px;
   display: flex; align-items: stretch;
   box-shadow: var(--card-shadow);
   transition: box-shadow 0.15s, transform 0.15s, border-color 0.1s, background 0.1s;
@@ -407,6 +421,7 @@ body {
   .header-title { font-size: 16px; }
   .btn         { padding: 7px 11px; font-size: 13px; }
   .main        { padding: 10px 8px 100px; }
+  .cards-grid  { grid-template-columns: 1fr !important; }
   .card-body   { padding: 10px 11px; }
   .card-title  { font-size: 14px; }
   .trash-fab   { bottom: 20px; right: 14px; }
@@ -932,7 +947,7 @@ function renderCards() {
         </div>
       </div>`;
     }).join("");
-    return `<div class="date-header">${toDateLabel(date)}</div>${cards}`;
+    return `<div class="date-header">${toDateLabel(date)}</div><div class="cards-grid">${cards}</div>`;
   }).join("");
 }
 
