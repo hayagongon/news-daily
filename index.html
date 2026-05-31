@@ -499,11 +499,12 @@ body {
 
       <div class="settings-label">除外キーワード（1行1キーワード）</div>
       <div class="settings-desc">
-        タイトルや説明文にこのキーワードが含まれる記事を<strong>非表示</strong>にします。<br>
-        大文字・小文字は区別しません。
+        <strong>記事タイトル</strong>にこのキーワードが含まれる記事を非表示にします。<br>
+        説明文はチェックしないので、企業記事で「円安が追い風」と書かれていても除外されません。<br>
+        具体的なフレーズほど誤除外が少なくなります（例：「円安」より「円安が進」）。
       </div>
       <textarea class="kw-textarea" id="kwTextarea"
-                placeholder="相撲&#10;日経平均&#10;過去最高値&#10;（1行に1キーワード）"></textarea>
+                placeholder="相撲&#10;日経平均が&#10;日経平均続&#10;円安が進&#10;（1行に1キーワード）"></textarea>
       <div class="kw-count" id="kwCount"></div>
       <button class="btn-save-kw" onclick="saveKeywords()">キーワードを保存して適用</button>
     </div>
@@ -675,10 +676,10 @@ function getFiltered() {
     if (deletedIds.has(a.id)) return false;
     if (activeCat  !== "全て" && a.cat  !== activeCat) return false;
     if (activeDate !== "全て" && a.date !== activeDate) return false;
-    // 除外キーワード
+    // 除外キーワード（タイトルのみを対象にする）
     if (excludeKeywords.length > 0) {
-      const text = ((a.title || "") + " " + (a.desc || "")).toLowerCase();
-      if (excludeKeywords.some(kw => text.includes(kw.toLowerCase()))) return false;
+      const title = (a.title || "").toLowerCase();
+      if (excludeKeywords.some(kw => kw && title.includes(kw.toLowerCase()))) return false;
     }
     return true;
   });
