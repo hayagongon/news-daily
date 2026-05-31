@@ -1,8 +1,8 @@
 {
   "month": "2026-05",
-  "inputTokens": 0,
-  "outputTokens": 0,
-  "costUsd": 0.0,
+  "inputTokens": 1037,
+  "outputTokens": 4,
+  "costUsd": 0.0008456,
   "costJpy": 0,
-  "lastRun": ""
+  "lastRun": "2026-05-31 16:16:10"
 }
