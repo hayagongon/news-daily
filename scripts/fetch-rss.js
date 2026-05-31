@@ -22,7 +22,7 @@ const RULES_FILE        = path.join(ROOT_DIR, "filter-rules.txt");
 const KEEP_DAYS         = 30;   // 何日分の記事を保持するか
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 
-// Claude API 料金（claude-3-5-haiku-20241022）
+// Claude API 料金（claude-haiku-4-5）
 const PRICE_INPUT_PER_MTOK  = 0.80;  // USD per 1M input tokens
 const PRICE_OUTPUT_PER_MTOK = 4.00;  // USD per 1M output tokens
 const JPY_PER_USD           = 155;   // 概算レート
@@ -278,7 +278,7 @@ ${JSON.stringify(articleList, null, 0)}
   console.log(`  Claude API 呼び出し中（${newArticles.length}件の記事を送信）...`);
 
   const response = await claudePost({
-    model:      "claude-3-5-haiku-20241022",
+    model:      "claude-haiku-4-5",
     max_tokens: 1024,
     system:     "あなたはニュース記事のフィルタリングアシスタントです。ユーザーのルールに従い、除外すべき記事IDのJSON配列のみを出力します。余計な説明は一切不要です。",
     messages: [
