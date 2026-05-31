@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>📰 ニュース</title>
+<style>
+/* ===== リセット ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ===== テーマ変数 ===== */
+:root {
+  --bg:              #f0f2f5;
+  --surface:         #ffffff;
+  --surface2:        #fafafa;
+  --border:          #e8e8e8;
+  --text-primary:    #111111;
+  --text-secondary:  #555555;
+  --text-muted:      #999999;
+  --hd-bg:           #ffffff;
+  --hd-shadow:       0 2px 8px rgba(0,0,0,0.08);
+  --card-shadow:     0 1px 4px rgba(0,0,0,0.07);
+  --card-hover:      0 4px 16px rgba(0,0,0,0.13);
+  --sel-bg:          #f0f7ff;
+  --sel-border:      #2980b9;
+  --sel-check-bg:    #dbeeff;
+  --chip-bg:         #efefef;
+  --chip-txt:        #555;
+  --chip-active-bg:  #1a1a1a;
+  --chip-active-txt: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:              #101010;
+    --surface:         #1e1e1e;
+    --surface2:        #252525;
+    --border:          #333333;
+    --text-primary:    #f0f0f0;
+    --text-secondary:  #aaaaaa;
+    --text-muted:      #666666;
+    --hd-bg:           #1a1a1a;
+    --hd-shadow:       0 2px 8px rgba(0,0,0,0.45);
+    --card-shadow:     0 1px 4px rgba(0,0,0,0.35);
+    --card-hover:      0 4px 16px rgba(0,0,0,0.55);
+    --sel-bg:          #1a2a3a;
+    --sel-border:      #4a9fd4;
+    --sel-check-bg:    #1c2d3d;
+    --chip-bg:         #2a2a2a;
+    --chip-txt:        #ccc;
+    --chip-active-bg:  #eeeeee;
+    --chip-active-txt: #111111;
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 15px;
+  min-height: 100vh;
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--hd-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--hd-shadow);
+}
+.header-top {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+}
+.header-title { font-size: 17px; font-weight: 700; flex: 1; white-space: nowrap; }
+.header-stats { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+
+/* ボタン共通 */
+.btn {
+  display: inline-flex; align-items: center;
+  border: none; border-radius: 8px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+  padding: 8px 13px; white-space: nowrap;
+  transition: all 0.15s; font-family: inherit; line-height: 1;
+}
+.btn-select {
+  background: transparent;
+  border: 1.5px solid var(--sel-border);
+  color: var(--sel-border);
+}
+.btn-select:hover { background: var(--sel-bg); }
+.btn-delete { background: #e74c3c; color: #fff; }
+.btn-delete:disabled { background: var(--chip-bg); color: var(--text-muted); cursor: not-allowed; }
+.btn-delete:not(:disabled):hover { background: #c0392b; transform: scale(1.02); }
+
+/* 設定ボタン */
+.btn-settings {
+  background: transparent; border: none;
+  color: var(--text-muted); font-size: 17px;
+  cursor: pointer; padding: 4px 6px; border-radius: 6px;
+  line-height: 1; transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-settings:hover { background: var(--chip-bg); color: var(--text-secondary); }
+
+/* ===== フィルターバー ===== */
+.filter-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; overflow-x: auto; scrollbar-width: none;
+  border-top: 1px solid var(--border); -webkit-overflow-scrolling: touch;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; border: none;
+  background: var(--chip-bg); color: var(--chip-txt);
+  transition: all 0.15s; font-family: inherit; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip.active { background: var(--chip-active-bg); color: var(--chip-active-txt); }
+.chip:hover:not(.active) { opacity: 0.75; }
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+.filter-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
+
+.date-select {
+  padding: 5px 9px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-primary);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  font-family: inherit; flex-shrink: 0; outline: none;
+}
+.date-select:focus { border-color: var(--sel-border); }
+
+/* ===== ローディング ===== */
+.loading-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 80px 20px;
+  color: var(--text-muted); gap: 16px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--sel-border);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== エラー状態 ===== */
+.error-state {
+  display: none; text-align: center;
+  padding: 60px 20px; color: var(--text-muted);
+}
+.error-icon { font-size: 36px; margin-bottom: 12px; }
+.error-msg { font-size: 13px; color: #e74c3c; margin: 8px 0; }
+.btn-retry {
+  margin-top: 16px; background: var(--sel-border); color: #fff;
+  border: none; border-radius: 8px; padding: 10px 24px;
+  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+
+/* ===== メインコンテンツ ===== */
+.main { max-width: 760px; margin: 0 auto; padding: 10px 12px 100px; }
+
+/* ===== 日付グループヘッダー ===== */
+.date-header {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.07em; padding: 18px 2px 8px;
+}
+.date-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* ===== カード ===== */
+.card {
+  background: var(--surface); border-radius: 12px; margin-bottom: 8px;
+  display: flex; align-items: stretch;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.1s, background 0.1s;
+  overflow: hidden; cursor: pointer; border: 2px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.card:hover  { box-shadow: var(--card-hover); transform: translateY(-1px); }
+.card:active { transform: scale(0.99); }
+.card.selected { border-color: var(--sel-border); background: var(--sel-bg); }
+
+.card-check {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 13px; background: var(--surface2);
+  border-right: 1px solid var(--border); flex-shrink: 0;
+}
+.card.selected .card-check { background: var(--sel-check-bg); }
+
+.checkbox {
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.12s;
+}
+.card.selected .checkbox { background: var(--sel-border); border-color: var(--sel-border); }
+.checkbox-icon { display: none; }
+.card.selected .checkbox-icon { display: block; }
+
+.card-bar { width: 4px; flex-shrink: 0; }
+.card-body { flex: 1; padding: 11px 13px; min-width: 0; }
+
+.card-meta {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 6px; flex-wrap: wrap;
+}
+.cat-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 9px;
+  border-radius: 20px; white-space: nowrap; letter-spacing: 0.02em;
+}
+.date-badge {
+  font-size: 11px; color: var(--text-muted); font-weight: 600;
+  background: var(--chip-bg); padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+}
+.source-name { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-left: auto; }
+.card-title { font-size: 14.5px; font-weight: 700; line-height: 1.55; margin-bottom: 5px; color: var(--text-primary); }
+.card-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 7px; }
+.card-url   { font-size: 11px; color: #2980b9; text-decoration: none; opacity: 0.75; word-break: break-all; }
+.card-url:hover { opacity: 1; text-decoration: underline; }
+
+/* ===== 空状態 ===== */
+.empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; display: none; }
+.empty-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+
+/* ===== ゴミ箱フローティングボタン ===== */
+.trash-fab {
+  position: fixed; bottom: 28px; right: 20px; z-index: 300;
+  display: none; align-items: center; gap: 6px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text-muted); font-size: 13px; font-weight: 600;
+  padding: 9px 14px; border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.trash-fab:hover { color: var(--text-secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.2); transform: translateY(-1px); }
+.trash-fab.visible { display: flex; }
+.trash-fab-count {
+  background: #e74c3c; color: #fff; font-size: 11px; font-weight: 700;
+  padding: 2px 7px; border-radius: 10px; min-width: 22px; text-align: center;
+}
+
+/* ===== モーダル共通 ===== */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  z-index: 400; display: none; align-items: flex-end; justify-content: center;
+}
+.modal-backdrop.open { display: flex; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-sheet {
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 760px; max-height: 70vh;
+  display: flex; flex-direction: column;
+  animation: slideUp 0.25s cubic-bezier(0.34, 1.2, 0.64, 1); overflow: hidden;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.modal-header {
+  display: flex; align-items: center; padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.modal-title { flex: 1; font-size: 15px; font-weight: 700; color: var(--text-muted); }
+.modal-close {
+  background: var(--chip-bg); border: none; color: var(--text-muted);
+  font-size: 14px; font-weight: 600; padding: 6px 14px;
+  border-radius: 20px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.modal-close:hover { color: var(--text-primary); }
+
+.modal-body { overflow-y: auto; padding: 12px 14px 28px; -webkit-overflow-scrolling: touch; }
+
+/* ゴミ箱カード */
+.trash-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border-radius: 10px;
+  padding: 10px 12px 10px 10px; margin-bottom: 8px;
+  border-left: 3px solid var(--border); opacity: 0.75;
+}
+.trash-info { flex: 1; min-width: 0; }
+.trash-meta  { font-size: 10.5px; font-weight: 700; margin-bottom: 3px; }
+.trash-title { font-size: 13px; color: var(--text-secondary); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-restore {
+  background: transparent; border: 1.5px solid var(--border); color: var(--text-muted);
+  font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px;
+  cursor: pointer; white-space: nowrap; font-family: inherit; flex-shrink: 0; transition: all 0.15s;
+}
+.btn-restore:hover { border-color: var(--sel-border); color: var(--sel-border); }
+
+/* ===== 設定モーダル（設定シート） ===== */
+.settings-sheet {
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 760px;
+  animation: slideUp 0.25s cubic-bezier(0.34, 1.2, 0.64, 1); overflow: hidden;
+}
+.settings-body { padding: 8px 18px 32px; }
+
+.settings-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.05em; margin: 16px 0 6px;
+}
+.settings-desc {
+  font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 10px;
+}
+
+.pat-input {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--surface2); color: var(--text-primary);
+  font-size: 13px; font-family: monospace; outline: none;
+  transition: border-color 0.15s;
+}
+.pat-input:focus { border-color: var(--sel-border); }
+
+.pat-status {
+  font-size: 12px; margin-top: 6px;
+  padding: 6px 10px; border-radius: 6px;
+}
+.pat-status.ok  { background: #e8f8f0; color: #27ae60; }
+.pat-status.ng  { background: #fef9e7; color: #95700a; }
+
+@media (prefers-color-scheme: dark) {
+  .pat-status.ok { background: #1a3a2a; color: #58d68d; }
+  .pat-status.ng { background: #2a2a1a; color: #f0c040; }
+}
+
+.settings-btns { display: flex; gap: 8px; margin-top: 12px; }
+.btn-save-pat {
+  flex: 1; background: var(--sel-border); color: #fff;
+  border: none; border-radius: 8px; padding: 10px 0;
+  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.btn-save-pat:hover { background: #2471a3; }
+.btn-clear-pat {
+  background: transparent; border: 1.5px solid var(--border); color: var(--text-muted);
+  border-radius: 8px; padding: 10px 16px;
+  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.btn-clear-pat:hover { border-color: #e74c3c; color: #e74c3c; }
+
+.sync-info {
+  font-size: 12px; color: var(--text-muted);
+  background: var(--chip-bg); border-radius: 8px;
+  padding: 10px 12px; margin-top: 16px; line-height: 1.7;
+}
+
+/* ===== トースト ===== */
+.toast {
+  position: fixed; bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(90px);
+  background: #2c3e50; color: #fff;
+  padding: 10px 22px; border-radius: 24px;
+  font-size: 14px; font-weight: 500;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 999; white-space: nowrap; pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ===== モバイル調整 ===== */
+@media (max-width: 480px) {
+  .header-top  { padding: 9px 12px; gap: 7px; }
+  .header-title { font-size: 16px; }
+  .btn         { padding: 7px 11px; font-size: 13px; }
+  .main        { padding: 10px 8px 100px; }
+  .card-body   { padding: 10px 11px; }
+  .card-title  { font-size: 14px; }
+  .trash-fab   { bottom: 20px; right: 14px; }
+  .modal-sheet { max-height: 80vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== ヘッダー ===== -->
+<div class="header" id="headerEl">
+  <div class="header-top">
+    <div class="header-title">📰 ニュース</div>
+    <button class="btn-settings" title="設定" onclick="openSettings()">⚙</button>
+    <span class="header-stats" id="stats"></span>
+    <button class="btn btn-select" id="btnSelectAll" onclick="toggleSelectAll()">全選択</button>
+    <button class="btn btn-delete" id="btnDelete" onclick="deleteSelected()" disabled>削除</button>
+  </div>
+  <div class="filter-bar" id="filterBar">
+    <button class="chip active" data-cat="全て"                    onclick="setCategory('全て')">全て</button>
+    <button class="chip" data-cat="政治"                           onclick="setCategory('政治')"><span class="chip-dot" style="background:#8e44ad"></span>政治</button>
+    <button class="chip" data-cat="経済"                           onclick="setCategory('経済')"><span class="chip-dot" style="background:#2980b9"></span>経済</button>
+    <button class="chip" data-cat="社会"                           onclick="setCategory('社会')"><span class="chip-dot" style="background:#7f8c8d"></span>社会</button>
+    <button class="chip" data-cat="国際"                           onclick="setCategory('国際')"><span class="chip-dot" style="background:#d35400"></span>国際</button>
+    <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')"><span class="chip-dot" style="background:#16a085"></span>スポーツ</button>
+    <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')"><span class="chip-dot" style="background:#e91e8c"></span>芸能</button>
+    <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')"><span class="chip-dot" style="background:#2c3e50"></span>テクノロジー</button>
+    <div class="filter-sep"></div>
+    <select class="date-select" id="dateSelect" onchange="setDate(this.value)">
+      <option value="全て">全日付</option>
+    </select>
+  </div>
+</div>
+
+<!-- ===== ローディング ===== -->
+<div class="loading-state" id="loadingState">
+  <div class="spinner"></div>
+  <div>記事を読み込んでいます…</div>
+</div>
+
+<!-- ===== エラー ===== -->
+<div class="error-state" id="errorState">
+  <div class="error-icon">⚠️</div>
+  <div>読み込みに失敗しました</div>
+  <div class="error-msg" id="errorMsg"></div>
+  <button class="btn-retry" onclick="init()">再読み込み</button>
+</div>
+
+<!-- ===== メインコンテンツ ===== -->
+<div class="main" id="mainContent" style="display:none">
+  <div id="newsList"></div>
+  <div class="empty" id="emptyState">
+    <span class="empty-icon" id="emptyIcon">📭</span>
+    <span id="emptyText">記事がまだありません</span>
+  </div>
+</div>
+
+<!-- ===== ゴミ箱フローティングボタン ===== -->
+<button class="trash-fab" id="trashFab" onclick="openTrash()">
+  🗑 削除済み <span class="trash-fab-count" id="trashCount">0</span>
+</button>
+
+<!-- ===== ゴミ箱モーダル ===== -->
+<div class="modal-backdrop" id="trashBackdrop" onclick="closeTrashOnBackdrop(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="trashModalTitle">削除済み（0件）</div>
+      <button class="modal-close" onclick="closeTrash()">閉じる</button>
+    </div>
+    <div class="modal-body" id="trashList"></div>
+  </div>
+</div>
+
+<!-- ===== 設定モーダル ===== -->
+<div class="modal-backdrop" id="settingsBackdrop" onclick="closeSettingsOnBackdrop(event)">
+  <div class="settings-sheet">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--text-primary);font-size:16px">⚙ 設定</div>
+      <button class="modal-close" onclick="closeSettings()">閉じる</button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-label">GitHub Personal Access Token (PAT)</div>
+      <div class="settings-desc">
+        削除した記事を他のデバイス（スマホなど）と同期するために必要です。<br>
+        PATはこのデバイスのみに保存されます（各デバイスで1回だけ設定してください）。
+      </div>
+      <input class="pat-input" id="patInput" type="password"
+             placeholder="github_pat_xxxxxx… または ghp_xxxxxx…">
+      <div class="pat-status ng" id="patStatus">未設定（このデバイスのみに削除が反映されます）</div>
+      <div class="settings-btns">
+        <button class="btn-save-pat" onclick="savePAT()">保存</button>
+        <button class="btn-clear-pat" onclick="clearPATUI()">クリア</button>
+      </div>
+
+      <div class="sync-info">
+        💡 PATの作成方法：<br>
+        GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>
+        → "news-daily" リポジトリを選択 → Contents: Read and Write → Generate
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== トースト ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 設定 =====
+const OWNER    = "hayagongon";
+const REPO     = "news-daily";
+const BRANCH   = "main";
+const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
+
+// カテゴリ色
+const CAT_COLOR = {
+  "政治":                   "#8e44ad",
+  "経済":                   "#2980b9",
+  "社会":                   "#7f8c8d",
+  "国際":                   "#d35400",
+  "スポーツ":               "#16a085",
+  "芸能・エンタメ・ゴシップ": "#e91e8c",
+  "テクノロジー":            "#2c3e50",
+};
+const CAT_SHORT = { "芸能・エンタメ・ゴシップ": "芸能" };
+
+// ===== 状態 =====
+let allArticles = [];
+let deletedIds  = new Set();
+let selectedIds = new Set();
+let activeCat   = "全て";
+let activeDate  = "全て";
+
+// ===== PAT 管理 =====
+const PAT = {
+  get:   ()    => localStorage.getItem("gh_pat") || "",
+  set:   (val) => localStorage.setItem("gh_pat", val.trim()),
+  clear: ()    => localStorage.removeItem("gh_pat"),
+};
+
+// ===== GitHub API =====
+async function ghContents(path, options = {}) {
+  const pat = PAT.get();
+  const headers = { Accept: "application/vnd.github+json" };
+  if (pat) headers.Authorization = `Bearer ${pat}`;
+  const res = await fetch(`${API_BASE}/${path}`, { headers, ...options });
+  const json = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data: json };
+}
+
+async function ghPut(path, content, sha, message) {
+  const pat = PAT.get();
+  if (!pat) return { ok: false, reason: "noPAT" };
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${pat}`,
+    "Content-Type": "application/json",
+  };
+  const body = { message, content: btoa(content), branch: BRANCH };
+  if (sha) body.sha = sha;
+  const res = await fetch(`${API_BASE}/${path}`, {
+    method: "PUT", headers, body: JSON.stringify(body),
+  });
+  return { ok: res.ok, data: await res.json().catch(() => null) };
+}
+
+// ===== 削除済みID の保存 =====
+function loadLocalDeleted() {
+  try { return JSON.parse(localStorage.getItem("deletedIds") || "[]"); }
+  catch { return []; }
+}
+function saveLocalDeleted(ids) {
+  localStorage.setItem("deletedIds", JSON.stringify([...ids]));
+}
+
+async function loadRemoteDeleted() {
+  try {
+    const { ok, data } = await ghContents("deleted-ids.json");
+    if (!ok || !data || !data.content) return { ids: [], sha: null };
+    const ids = JSON.parse(atob(data.content.replace(/\n/g, "")));
+    return { ids: Array.isArray(ids) ? ids : [], sha: data.sha };
+  } catch {
+    return { ids: [], sha: null };
+  }
+}
+
+async function syncDeleted() {
+  if (!PAT.get()) return;
+  try {
+    // 現在の SHA を取得して上書き保存
+    const { sha } = await loadRemoteDeleted();
+    await ghPut(
+      "deleted-ids.json",
+      JSON.stringify([...deletedIds], null, 2),
+      sha,
+      `🗑 deleted-ids (${deletedIds.size}件)`
+    );
+  } catch (e) {
+    console.warn("GitHub同期に失敗:", e.message);
+  }
+}
+
+// ===== 記事の読み込み =====
+async function fetchArticles() {
+  // GitHub Pages 経由でキャッシュを回避して取得
+  const res = await fetch(`./rss-articles.json?t=${Date.now()}`);
+  if (!res.ok) throw new Error(`記事の読み込みに失敗しました (HTTP ${res.status})`);
+  return res.json();
+}
+
+// ===== 初期化 =====
+async function init() {
+  document.getElementById("loadingState").style.display = "flex";
+  document.getElementById("errorState").style.display   = "none";
+  document.getElementById("mainContent").style.display  = "none";
+
+  try {
+    const [articles, remote] = await Promise.all([
+      fetchArticles(),
+      loadRemoteDeleted(),
+    ]);
+
+    allArticles = Array.isArray(articles) ? articles : [];
+
+    // ローカル + リモートの削除IDをマージ
+    const local = loadLocalDeleted();
+    deletedIds  = new Set([...local, ...remote.ids]);
+    saveLocalDeleted(deletedIds);
+
+  } catch (e) {
+    document.getElementById("loadingState").style.display = "none";
+    document.getElementById("errorState").style.display   = "block";
+    document.getElementById("errorMsg").textContent       = e.message;
+    return;
+  }
+
+  document.getElementById("loadingState").style.display = "none";
+  document.getElementById("mainContent").style.display  = "block";
+  render();
+}
+
+// ===== フィルター =====
+function getFiltered() {
+  return allArticles.filter(a =>
+    !deletedIds.has(a.id) &&
+    (activeCat  === "全て" || a.cat  === activeCat) &&
+    (activeDate === "全て" || a.date === activeDate)
+  );
+}
+function getDeleted() {
+  return allArticles
+    .filter(a => deletedIds.has(a.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function setCategory(cat) { activeCat = cat; selectedIds.clear(); render(); }
+function setDate(val)      { activeDate = val; selectedIds.clear(); render(); }
+
+// ===== 選択 =====
+function toggleSelect(id, e) {
+  if (e && e.target.closest("a, button")) return;
+  selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
+  const card = document.getElementById("card-" + id);
+  if (card) card.classList.toggle("selected", selectedIds.has(id));
+  updateHeader();
+}
+function toggleSelectAll() {
+  const visible    = getFiltered().map(a => a.id);
+  const allChecked = visible.length > 0 && visible.every(id => selectedIds.has(id));
+  if (allChecked) visible.forEach(id => selectedIds.delete(id));
+  else            visible.forEach(id => selectedIds.add(id));
+  renderCards();
+  updateHeader();
+}
+
+// ===== 削除 =====
+async function deleteSelected() {
+  const count = selectedIds.size;
+  if (!count) return;
+  selectedIds.forEach(id => deletedIds.add(id));
+  selectedIds.clear();
+  saveLocalDeleted(deletedIds);
+  render();
+  showToast(`${count}件を削除しました`);
+  await syncDeleted();
+}
+
+// ===== 復元 =====
+async function restore(id) {
+  deletedIds.delete(id);
+  saveLocalDeleted(deletedIds);
+  render();
+  renderTrashModal();
+  if (getDeleted().length === 0) closeTrash();
+  showToast("記事を復元しました");
+  await syncDeleted();
+}
+
+// ===== ヘッダー更新 =====
+function updateHeader() {
+  const filtered = getFiltered();
+  const total    = filtered.length;
+  const sel      = selectedIds.size;
+
+  document.getElementById("stats").textContent =
+    sel > 0 ? `${sel}件選択中 / ${total}件` : `${total}件`;
+
+  const btnDel = document.getElementById("btnDelete");
+  btnDel.disabled    = sel === 0;
+  btnDel.textContent = sel > 0 ? `🗑 ${sel}件を削除` : "削除";
+
+  const allSel = total > 0 && filtered.every(a => selectedIds.has(a.id));
+  document.getElementById("btnSelectAll").textContent = allSel ? "選択解除" : "全選択";
+
+  document.querySelectorAll(".chip[data-cat]").forEach(chip => {
+    chip.classList.toggle("active", chip.dataset.cat === activeCat);
+  });
+}
+
+// ===== 日付セレクト更新 =====
+function updateDateSelect() {
+  const sel   = document.getElementById("dateSelect");
+  const dates = [...new Set(
+    allArticles.filter(a => !deletedIds.has(a.id)).map(a => a.date)
+  )].sort((a, b) => b.localeCompare(a));
+
+  sel.innerHTML = `<option value="全て">全日付</option>` +
+    dates.map(d =>
+      `<option value="${d}"${d === activeDate ? " selected" : ""}>${toDateLabel(d)}</option>`
+    ).join("");
+
+  if (!dates.includes(activeDate)) activeDate = "全て";
+}
+
+// ===== カード描画 =====
+function renderCards() {
+  const list     = document.getElementById("newsList");
+  const emptyEl  = document.getElementById("emptyState");
+  const filtered = getFiltered();
+
+  if (filtered.length === 0) {
+    list.innerHTML = "";
+    emptyEl.style.display = "block";
+    if (allArticles.length === 0) {
+      document.getElementById("emptyIcon").textContent = "📭";
+      document.getElementById("emptyText").textContent =
+        "記事はまだありません。毎日 23:55 に自動取得されます。";
+    } else {
+      document.getElementById("emptyIcon").textContent = "🔍";
+      document.getElementById("emptyText").textContent = "該当する記事がありません";
+    }
+    return;
+  }
+  emptyEl.style.display = "none";
+
+  const byDate = {};
+  filtered.forEach(a => { (byDate[a.date] = byDate[a.date] || []).push(a); });
+  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+  list.innerHTML = sortedDates.map(date => {
+    const cards = byDate[date].map(a => {
+      const col = catColor(a.cat);
+      const sel = selectedIds.has(a.id);
+      return `<div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
+        <div class="card-check">
+          <div class="checkbox">
+            <svg class="checkbox-icon" width="13" height="10" viewBox="0 0 13 10" fill="none">
+              <polyline points="1.5,5 5,8.5 11.5,1.5" stroke="white" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-bar" style="background:${col}"></div>
+        <div class="card-body">
+          <div class="card-meta">
+            <span class="cat-badge" style="background:${col}22;color:${col}">${catShort(a.cat)}</span>
+            <span class="date-badge">${toShortDate(a.date)}</span>
+            <span class="source-name">${escHtml(a.src)}</span>
+          </div>
+          <div class="card-title">${escHtml(a.title)}</div>
+          <div class="card-desc">${escHtml(a.desc || "")}</div>
+          <a class="card-url" href="${escHtml(a.url)}" target="_blank" rel="noopener"
+             onclick="event.stopPropagation()">🔗 ${getDomain(a.url)}</a>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="date-header">${toDateLabel(date)}</div>${cards}`;
+  }).join("");
+}
+
+// ===== ゴミ箱フローティングボタン更新 =====
+function updateTrashFab() {
+  const n   = getDeleted().length;
+  const fab = document.getElementById("trashFab");
+  fab.classList.toggle("visible", n > 0);
+  document.getElementById("trashCount").textContent = n;
+}
+
+// ===== ゴミ箱モーダル描画 =====
+function renderTrashModal() {
+  const deleted = getDeleted();
+  document.getElementById("trashModalTitle").textContent = `削除済み（${deleted.length}件）`;
+  document.getElementById("trashList").innerHTML = deleted.map(a => {
+    const col = catColor(a.cat);
+    return `<div class="trash-card" style="border-left-color:${col}">
+      <div class="trash-info">
+        <div class="trash-meta" style="color:${col}">${catShort(a.cat)} · ${toShortDate(a.date)}</div>
+        <div class="trash-title">${escHtml(a.title)}</div>
+      </div>
+      <button class="btn-restore" onclick="restore('${a.id}')">復元</button>
+    </div>`;
+  }).join("");
+}
+
+function openTrash()             { renderTrashModal(); document.getElementById("trashBackdrop").classList.add("open"); document.body.style.overflow = "hidden"; }
+function closeTrash()            { document.getElementById("trashBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeTrashOnBackdrop(e) { if (e.target === document.getElementById("trashBackdrop")) closeTrash(); }
+
+// ===== 設定モーダル =====
+function openSettings() {
+  const pat = PAT.get();
+  document.getElementById("patInput").value = "";  // セキュリティ上、毎回空欄から
+  updatePatStatus();
+  document.getElementById("settingsBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeSettings()            { document.getElementById("settingsBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeSettingsOnBackdrop(e) { if (e.target === document.getElementById("settingsBackdrop")) closeSettings(); }
+
+function updatePatStatus() {
+  const el  = document.getElementById("patStatus");
+  const pat = PAT.get();
+  if (pat) {
+    el.className    = "pat-status ok";
+    el.textContent  = `✅ 設定済み（末尾: …${pat.slice(-4)}）`;
+  } else {
+    el.className    = "pat-status ng";
+    el.textContent  = "未設定（このデバイスのみに削除が反映されます）";
+  }
+}
+
+function savePAT() {
+  const val = document.getElementById("patInput").value.trim();
+  if (!val) { showToast("PATを入力してください"); return; }
+  PAT.set(val);
+  document.getElementById("patInput").value = "";
+  updatePatStatus();
+  showToast("✅ PATを保存しました");
+  // すぐに同期を試みる
+  syncDeleted();
+}
+function clearPATUI() {
+  PAT.clear();
+  document.getElementById("patInput").value = "";
+  updatePatStatus();
+  showToast("PATをクリアしました");
+}
+
+// ===== 全体再描画 =====
+function render() {
+  updateDateSelect();
+  renderCards();
+  updateTrashFab();
+  updateHeader();
+}
+
+// ===== ユーティリティ =====
+const DAYS = ["日","月","火","水","木","金","土"];
+
+function toDateLabel(s) {
+  const d = new Date(s + "T00:00:00");
+  return `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
+}
+function toShortDate(s) {
+  const d = new Date(s + "T00:00:00");
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function catColor(cat)  { return CAT_COLOR[cat]  || "#888"; }
+function catShort(cat)  { return CAT_SHORT[cat]  || cat; }
+function getDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); }
+  catch { return url; }
+}
+function escHtml(s) {
+  return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+                  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ===== トースト =====
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2800);
+}
+
+// ===== 起動 =====
+init();
+</script>
+</body>
+</html>
