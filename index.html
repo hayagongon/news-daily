@@ -235,8 +235,16 @@ body {
 .source-name { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-left: auto; }
 .card-title { font-size: 14.5px; font-weight: 700; line-height: 1.55; margin-bottom: 5px; color: var(--text-primary); }
 .card-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 7px; }
-.card-url   { font-size: 11px; color: #2980b9; text-decoration: none; opacity: 0.75; word-break: break-all; }
+.card-actions { display: flex; align-items: center; gap: 6px; }
+.card-url   { font-size: 11px; color: #2980b9; text-decoration: none; opacity: 0.75; word-break: break-all; flex: 1; min-width: 0; }
 .card-url:hover { opacity: 1; text-decoration: underline; }
+.wayback-btn {
+  flex-shrink: 0; border: none; background: none; cursor: pointer;
+  font-size: 13px; padding: 2px 4px; border-radius: 4px; line-height: 1;
+  opacity: 0.5; transition: opacity 0.15s;
+}
+.wayback-btn:hover { opacity: 1; background: var(--chip-bg); }
+.wayback-btn:disabled { cursor: default; }
 
 /* ===== 空状態 ===== */
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; display: none; }
@@ -952,8 +960,12 @@ function renderCards() {
           </div>
           <div class="card-title">${escHtml(a.title)}</div>
           <div class="card-desc">${escHtml(a.desc || "")}</div>
-          <a class="card-url" href="${escHtml(a.url)}" target="_blank" rel="noopener"
-             onclick="event.stopPropagation()">🔗 ${getDomain(a.url)}</a>
+          <div class="card-actions">
+            <a class="card-url" href="${escHtml(a.url)}" target="_blank" rel="noopener"
+               onclick="event.stopPropagation()">🔗 ${getDomain(a.url)}</a>
+            <button class="wayback-btn" title="Webアーカイブで開く"
+                    onclick="openWayback('${escHtml(a.url)}',event)">📦</button>
+          </div>
         </div>
         </div>
       </div>`;
@@ -1059,6 +1071,36 @@ function catShort(cat)  { return CAT_SHORT[cat]  || cat; }
 function getDomain(url) {
   try { return new URL(url).hostname.replace(/^www\./, ""); }
   catch { return url; }
+}
+
+// ===== Wayback Machine フォールバック =====
+async function openWayback(url, event) {
+  event.stopPropagation();
+  const btn = event.currentTarget;
+  const orig = btn.textContent;
+  btn.textContent = "⏳";
+  btn.disabled = true;
+  try {
+    const res  = await fetch(
+      `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const data = await res.json();
+    const snap = data?.archived_snapshots?.closest?.url;
+    if (snap) {
+      window.open(snap, "_blank", "noopener");
+    } else {
+      btn.textContent = "❌";
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+      return;
+    }
+  } catch (e) {
+    btn.textContent = "❌";
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+    return;
+  }
+  btn.textContent = orig;
+  btn.disabled = false;
 }
 function escHtml(s) {
   return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
