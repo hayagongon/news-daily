@@ -1,8 +1,8 @@
 {
   "month": "2026-06",
-  "inputTokens": 8286,
-  "outputTokens": 23,
-  "costUsd": 0.006720800000000001,
-  "costJpy": 1,
-  "lastRun": "2026-06-01 03:56:04"
+  "inputTokens": 24726,
+  "outputTokens": 141,
+  "costUsd": 0.0203448,
+  "costJpy": 3,
+  "lastRun": "2026-06-02 07:53:00"
 }
