@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add rss-articles.json ai-excluded-ids.json api-usage.json
+          git add rss-articles.json ai-excluded-ids.json api-usage.json filter-rules.txt deleted-articles-log.json feedback.txt
           git diff --staged --quiet \
             || git commit -m "📰 $(date -u +'%Y-%m-%d') ニュース更新"
           git push

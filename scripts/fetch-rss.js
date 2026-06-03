@@ -19,13 +19,21 @@ const DATA_FILE         = path.join(ROOT_DIR, "rss-articles.json");
 const EXCLUDED_FILE     = path.join(ROOT_DIR, "ai-excluded-ids.json");
 const USAGE_FILE        = path.join(ROOT_DIR, "api-usage.json");
 const RULES_FILE        = path.join(ROOT_DIR, "filter-rules.txt");
-const KEEP_DAYS         = 30;   // 何日分の記事を保持するか
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
+const KEEP_DAYS              = 30;   // 何日分の記事を保持するか
+const ANTHROPIC_API_KEY      = process.env.ANTHROPIC_API_KEY || "";
+const DELETED_LOG_FILE       = path.join(ROOT_DIR, "deleted-articles-log.json");
+const FEEDBACK_FILE          = path.join(ROOT_DIR, "feedback.txt");
+const LEARNING_LOG_DAYS      = 30;   // 削除ログの保持日数
+const LEARNING_INTERVAL_DAYS = 7;    // 学習を実行する間隔（日）
+const LEARNING_MIN_ENTRIES   = 20;   // 学習実行に必要な最低件数
 
-// Claude API 料金（claude-haiku-4-5）
+// Claude Haiku API 料金（日次フィルタリング用）
 const PRICE_INPUT_PER_MTOK  = 0.80;  // USD per 1M input tokens
 const PRICE_OUTPUT_PER_MTOK = 4.00;  // USD per 1M output tokens
-const JPY_PER_USD           = 155;   // 概算レート
+// Claude Sonnet API 料金（週次学習用）
+const PRICE_SONNET_INPUT     = 3.00;  // USD per 1M input tokens
+const PRICE_SONNET_OUTPUT    = 15.00; // USD per 1M output tokens
+const JPY_PER_USD            = 155;   // 概算レート
 
 // ===== RSS ソース一覧 =====
 // NHK RSSカテゴリ対応: cat4=政治 cat5=経済 cat6=国際 cat7=スポーツ cat3=科学・医療
@@ -209,8 +217,10 @@ function claudePost(payload) {
   });
 }
 
-// ===== APIトークン使用量を累積保存 =====
-function updateUsage(inputTokens, outputTokens) {
+// ===== APIトークン使用量を累積保存（モデル別料金に対応） =====
+function updateUsage(inputTokens, outputTokens,
+                     inputPrice  = PRICE_INPUT_PER_MTOK,
+                     outputPrice = PRICE_OUTPUT_PER_MTOK) {
   let usage = {
     month: monthJST(),
     inputTokens: 0,
@@ -230,12 +240,12 @@ function updateUsage(inputTokens, outputTokens) {
     } catch (_) {}
   }
 
+  // 今回の呼び出し分のコストを増分加算（モデルごとに料金が異なるため）
+  const marginalCost = inputTokens  / 1_000_000 * inputPrice +
+                       outputTokens / 1_000_000 * outputPrice;
   usage.inputTokens  += inputTokens;
   usage.outputTokens += outputTokens;
-  usage.costUsd = (
-    usage.inputTokens  / 1_000_000 * PRICE_INPUT_PER_MTOK +
-    usage.outputTokens / 1_000_000 * PRICE_OUTPUT_PER_MTOK
-  );
+  usage.costUsd      += marginalCost;
   usage.costJpy = Math.round(usage.costUsd * JPY_PER_USD);
   usage.lastRun = new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19);
 
@@ -313,11 +323,178 @@ ${JSON.stringify(articleList, null, 0)}
   }
 }
 
+// ===== タイトルを等間隔サンプリング =====
+function sampleTitles(titles, n) {
+  if (titles.length <= n) return titles;
+  const result = [];
+  const step = titles.length / n;
+  for (let i = 0; i < n; i++) {
+    result.push(titles[Math.floor(i * step)]);
+  }
+  return result;
+}
+
+// ===== Claude Sonnet で傾向学習 =====
+async function learnWithClaude(logEntries, feedback, currentRules) {
+  if (!ANTHROPIC_API_KEY) {
+    console.log("  ⚠️ ANTHROPIC_API_KEY 未設定のためスキップ");
+    return null;
+  }
+
+  // カテゴリ別に集計（30日分から均等サンプリング）
+  const byCat = {};
+  for (const e of logEntries) {
+    (byCat[e.cat] = byCat[e.cat] || []).push(e.title);
+  }
+  const statsText = Object.entries(byCat).map(([cat, titles]) => {
+    const samples = sampleTitles(titles, 30).map(t => `  ・${t}`).join("\n");
+    return `【${cat}】${titles.length}件削除\n${samples}`;
+  }).join("\n\n");
+
+  const feedbackSection = feedback
+    ? `\n## ユーザーが取得してほしかった記事（フィードバック）\n${feedback}` : "";
+
+  const prompt =
+`ニュース取得システムのフィルタールールを更新してください。
+
+## 現在の filter-rules.txt
+${currentRules}
+
+## ユーザーが過去30日間に削除した記事（カテゴリ別・均等サンプル）
+${statsText}
+${feedbackSection}
+
+## 更新指示
+1. 削除記事のタイトルからユーザーが読みたくない傾向を読み取り、
+   「## ❌ 除外したい傾向（削除履歴から学習・自動更新）」セクションを更新する
+2. フィードバックがある場合は
+   「## ✅ 取得したい傾向（フィードバックから学習・自動更新）」セクションも更新する
+3. 上記2セクション以外は一切変更しない（手動設定ルールを保持する）
+4. 対象セクションが存在しない場合は末尾に追加する
+5. filter-rules.txt の全文のみを出力する（コードブロック記号・説明文は不要）`;
+
+  console.log("  Claude Sonnet で傾向を学習中...");
+  const response = await claudePost({
+    model:      "claude-sonnet-4-6",
+    max_tokens: 4096,
+    system:     "あなたはニュースフィルター管理AIです。filter-rules.txtの全文のみを出力してください。コードブロック記号や説明文は一切不要です。",
+    messages:   [{ role: "user", content: prompt }],
+  });
+
+  const inputTokens  = response.usage?.input_tokens  || 0;
+  const outputTokens = response.usage?.output_tokens || 0;
+  const usage = updateUsage(inputTokens, outputTokens, PRICE_SONNET_INPUT, PRICE_SONNET_OUTPUT);
+  console.log(`  学習トークン: 入力 ${inputTokens} / 出力 ${outputTokens}`);
+  console.log(`  今月累計: ¥${usage.costJpy} ($${usage.costUsd.toFixed(4)})`);
+
+  let result = (response.content?.[0]?.text || "").trim();
+  // コードブロックが混入した場合は除去
+  result = result.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim();
+
+  if (!result || result.length < 100 || !result.includes("##")) {
+    console.log("  ⚠️ 学習結果が不正（内容が短すぎるか形式が異常）");
+    return null;
+  }
+  return result;
+}
+
+// ===== 週次傾向学習 =====
+async function runWeeklyLearning() {
+  // 削除ログを読み込む
+  let logData = { lastLearningDate: null, entries: [] };
+  if (fs.existsSync(DELETED_LOG_FILE)) {
+    try {
+      logData = JSON.parse(fs.readFileSync(DELETED_LOG_FILE, "utf8"));
+    } catch (e) {
+      console.log(`  ⚠️ 削除ログ読み込みエラー: ${e.message}`);
+    }
+  }
+  if (!Array.isArray(logData.entries)) logData.entries = [];
+
+  // 30日超えのエントリを削除（毎回実行してログを適正サイズに保つ）
+  const today     = todayJST();
+  const logCutoff = new Date(Date.now() + 9 * 3600 * 1000 - LEARNING_LOG_DAYS * 86400 * 1000)
+    .toISOString().slice(0, 10);
+  const beforePrune = logData.entries.length;
+  logData.entries = logData.entries.filter(e => (e.date || "") >= logCutoff);
+  if (beforePrune !== logData.entries.length) {
+    console.log(`  ログ整理: ${beforePrune}件 → ${logData.entries.length}件（${logCutoff}以前を削除）`);
+  }
+  console.log(`  削除ログ: ${logData.entries.length}件`);
+
+  // 週次実行チェック
+  const lastDate  = logData.lastLearningDate || "2000-01-01";
+  const daysSince = Math.floor((new Date(today) - new Date(lastDate)) / 86400000);
+  if (daysSince < LEARNING_INTERVAL_DAYS) {
+    console.log(`  スキップ（前回: ${lastDate}、${daysSince}日経過 / ${LEARNING_INTERVAL_DAYS}日で実行）`);
+    fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify(logData, null, 2), "utf8");
+    return;
+  }
+
+  // データ最低件数チェック
+  if (logData.entries.length < LEARNING_MIN_ENTRIES) {
+    console.log(`  データ不足（${logData.entries.length}件、最低${LEARNING_MIN_ENTRIES}件必要）`);
+    fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify(logData, null, 2), "utf8");
+    return;
+  }
+
+  console.log(`  学習実行: ${logData.entries.length}件のデータを分析`);
+
+  // フィードバック読み込み
+  let feedback = "";
+  if (fs.existsSync(FEEDBACK_FILE)) {
+    try { feedback = fs.readFileSync(FEEDBACK_FILE, "utf8").trim(); } catch (_) {}
+  }
+
+  // 現在のルール読み込み
+  const currentRules = fs.existsSync(RULES_FILE)
+    ? fs.readFileSync(RULES_FILE, "utf8") : "";
+
+  // Claude Sonnet で学習
+  let updatedRules;
+  try {
+    updatedRules = await learnWithClaude(logData.entries, feedback, currentRules);
+  } catch (e) {
+    console.log(`  ❌ Claude 呼び出しエラー: ${e.message}`);
+    fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify(logData, null, 2), "utf8");
+    return;
+  }
+
+  if (!updatedRules) {
+    console.log("  ⚠️ 学習結果が取得できなかったためルールは更新しません");
+    fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify(logData, null, 2), "utf8");
+    return;
+  }
+
+  // 結果を書き込む
+  fs.writeFileSync(RULES_FILE, updatedRules, "utf8");
+  console.log("  ✅ filter-rules.txt を更新しました");
+
+  if (feedback) {
+    fs.writeFileSync(FEEDBACK_FILE, "", "utf8");
+    console.log("  ✅ feedback.txt をクリアしました");
+  }
+
+  logData.lastLearningDate = today;
+  fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify(logData, null, 2), "utf8");
+  console.log(`  ✅ 削除ログを保存しました（次回学習予定: ${LEARNING_INTERVAL_DAYS}日後）`);
+}
+
 // ===== メイン処理 =====
 async function main() {
   console.log("\n📰 RSS 取得開始");
   console.log(`  実行時刻 (JST): ${new Date(Date.now() + 9*3600*1000).toISOString().replace("T"," ").slice(0,19)}`);
   console.log("─".repeat(50));
+
+  // ファイル初期化（初回実行時のみ）
+  if (!fs.existsSync(DELETED_LOG_FILE)) {
+    fs.writeFileSync(DELETED_LOG_FILE, JSON.stringify({ lastLearningDate: null, entries: [] }, null, 2), "utf8");
+    console.log("  削除ログを初期化しました");
+  }
+  if (!fs.existsSync(FEEDBACK_FILE)) {
+    fs.writeFileSync(FEEDBACK_FILE, "", "utf8");
+    console.log("  フィードバックファイルを初期化しました");
+  }
 
   // 既存データを読み込む
   let existing = [];
@@ -427,7 +604,17 @@ async function main() {
   console.log("\n" + "─".repeat(50));
   console.log(`✅ 完了: 合計取得 ${totalFetched} 件 / 新規追加 ${totalAdded} 件 / 保存合計 ${merged.length} 件`);
   console.log(`  AI除外: ${newExcludedIds.length} 件`);
-  console.log(`  （${KEEP_DAYS}日以内の記事を保持: ${cutoff} 〜 ${today}）\n`);
+  console.log(`  （${KEEP_DAYS}日以内の記事を保持: ${cutoff} 〜 ${today}）`);
+
+  // ===== 週次傾向学習 =====
+  console.log("\n🧠 週次傾向学習");
+  console.log("─".repeat(50));
+  try {
+    await runWeeklyLearning();
+  } catch (e) {
+    console.log(`  ❌ 週次学習エラー: ${e.message}`);
+  }
+  console.log("");
 }
 
 main().catch(e => {

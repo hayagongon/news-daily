@@ -608,6 +608,18 @@ body {
       <div class="kw-count" id="aiRulesStatus"></div>
       <button class="btn-save-kw" onclick="saveAiRules()">ルールを保存（GitHub）</button>
       <div class="cost-badge" id="aiCostBadge" style="margin-top:10px;display:none"></div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-label">📌 欲しかった記事を教える</div>
+      <div class="settings-desc">
+        自動取得されなかったが読みたかった記事の<strong>URLまたはタイトル</strong>を1行ずつ入力してください。<br>
+        週次処理でClaudeが傾向を学習し、今後の取得精度が向上します。
+      </div>
+      <textarea class="kw-textarea" id="feedbackTextarea"
+                placeholder="https://example.com/news/article&#10;または&#10;記事タイトルをそのまま貼り付け（1行1件）"></textarea>
+      <div class="kw-count" id="feedbackStatus"></div>
+      <button class="btn-save-kw" onclick="saveFeedback()">保存（GitHub）</button>
     </div>
   </div>
 </div>
@@ -782,6 +794,64 @@ async function ghPut(path, content, sha, message) {
   return { ok: res.ok, data: await res.json().catch(() => null) };
 }
 
+// ===== 削除ログ同期（メタデータを GitHub に保存） =====
+async function syncDeletedLog(newEntries) {
+  if (!PAT.get() || !newEntries.length) return;
+  try {
+    const { ok, data } = await ghContents("deleted-articles-log.json");
+    let logData = { lastLearningDate: null, entries: [] };
+    let sha;
+    if (ok && data?.content) {
+      const raw   = atob(data.content.replace(/\n/g, ""));
+      const bytes = new Uint8Array(raw.split("").map(c => c.charCodeAt(0)));
+      logData = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+      sha = data.sha;
+    }
+    if (!Array.isArray(logData.entries)) logData.entries = [];
+    logData.entries = [...logData.entries, ...newEntries];
+    await ghPut(
+      "deleted-articles-log.json",
+      JSON.stringify(logData, null, 2),
+      sha,
+      `📊 削除ログ +${newEntries.length}件`
+    );
+  } catch (e) {
+    console.warn("削除ログ同期エラー:", e.message);
+  }
+}
+
+// ===== フィードバック保存 =====
+async function saveFeedback() {
+  if (!PAT.get()) { showToast("PATを設定してください"); return; }
+  const content = (document.getElementById("feedbackTextarea").value || "").trim();
+  if (!content) { showToast("内容を入力してください"); return; }
+  const status = document.getElementById("feedbackStatus");
+  status.textContent = "保存中...";
+  try {
+    const { ok, data } = await ghContents("feedback.txt");
+    let existing = "";
+    let sha;
+    if (ok && data?.content) {
+      const raw   = atob(data.content.replace(/\n/g, ""));
+      const bytes = new Uint8Array(raw.split("").map(c => c.charCodeAt(0)));
+      existing = new TextDecoder("utf-8").decode(bytes).trim();
+      sha = data.sha;
+    }
+    const newContent = existing ? existing + "\n" + content : content;
+    const { ok: putOk } = await ghPut("feedback.txt", newContent, sha, "📌 フィードバック追加");
+    if (putOk) {
+      status.textContent = "✅ 保存しました（週次処理で学習されます）";
+      document.getElementById("feedbackTextarea").value = "";
+      showToast("フィードバックを保存しました");
+    } else {
+      status.textContent = "❌ 保存に失敗しました";
+      showToast("保存に失敗しました");
+    }
+  } catch (e) {
+    status.textContent = `❌ エラー: ${e.message}`;
+  }
+}
+
 // ===== 削除済みID の保存 =====
 function loadLocalDeleted() {
   try { return JSON.parse(localStorage.getItem("deletedIds") || "[]"); }
@@ -932,12 +1002,17 @@ function toggleSelectAll() {
 async function deleteSelected() {
   const count = selectedIds.size;
   if (!count) return;
+  // メタデータを先に収集（selectedIds.clear() 前に）
+  const meta = allArticles
+    .filter(a => selectedIds.has(a.id))
+    .map(a => ({ title: a.title, cat: a.cat, src: a.src, date: todayStr() }));
   selectedIds.forEach(id => deletedIds.add(id));
   selectedIds.clear();
   saveLocalDeleted(deletedIds);
   render();
   showToast(`${count}件を削除しました`);
   await syncDeleted();
+  syncDeletedLog(meta);  // fire-and-forget（UIをブロックしない）
 }
 
 // ===== 復元 =====
@@ -1161,6 +1236,7 @@ function render() {
 
 // ===== ユーティリティ =====
 const DAYS = ["日","月","火","水","木","金","土"];
+function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function toDateLabel(s) {
   const d = new Date(s + "T00:00:00");
