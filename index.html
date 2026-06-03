@@ -513,6 +513,7 @@ body {
   <div class="header-top">
     <div class="header-title">📰 ニュース</div>
     <button class="btn-settings" title="更新" onclick="location.reload()">🔄</button>
+    <button class="btn-settings" title="欲しかった記事を登録" onclick="openFeedback()">📌</button>
     <button class="btn-settings" title="設定" onclick="openSettings()">⚙</button>
     <span class="header-stats" id="stats"></span>
     <button class="btn btn-select" id="btnSelectAll" onclick="toggleSelectAll()">全選択</button>
@@ -570,6 +571,25 @@ body {
 <button class="trash-fab" id="trashFab" onclick="openTrash()">
   🗑 削除済み <span class="trash-fab-count" id="trashCount">0</span>
 </button>
+
+<!-- ===== フィードバックモーダル ===== -->
+<div class="modal-backdrop" id="feedbackBackdrop" onclick="closeFeedbackOnBackdrop(event)">
+  <div class="modal-sheet" style="max-height:60vh">
+    <div class="modal-header">
+      <div class="modal-title">📌 欲しかった記事を登録</div>
+      <button class="modal-close" onclick="closeFeedback()">閉じる</button>
+    </div>
+    <div class="modal-body" style="padding:14px 16px 24px">
+      <div class="settings-desc" style="margin-bottom:10px">
+        自動取得されなかった記事の<strong>URLまたはタイトル</strong>を1行ずつ入力。<br>週次処理でClaudeが傾向を学習します。
+      </div>
+      <textarea class="kw-textarea" id="feedbackTextarea" rows="5"
+                placeholder="https://example.com/news/article&#10;または&#10;記事タイトルをそのまま貼り付け（1行1件）"></textarea>
+      <div class="kw-count" id="feedbackStatus" style="margin-bottom:8px"></div>
+      <button class="btn-save-kw" onclick="saveFeedback()">保存（GitHub）</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== ゴミ箱モーダル ===== -->
 <div class="modal-backdrop" id="trashBackdrop" onclick="closeTrashOnBackdrop(event)">
@@ -635,17 +655,6 @@ body {
       <button class="btn-save-kw" onclick="saveAiRules()">ルールを保存（GitHub）</button>
       <div class="cost-badge" id="aiCostBadge" style="margin-top:10px;display:none"></div>
 
-      <div class="settings-divider"></div>
-
-      <div class="settings-label">📌 欲しかった記事を教える</div>
-      <div class="settings-desc">
-        自動取得されなかったが読みたかった記事の<strong>URLまたはタイトル</strong>を1行ずつ入力してください。<br>
-        週次処理でClaudeが傾向を学習し、今後の取得精度が向上します。
-      </div>
-      <textarea class="kw-textarea" id="feedbackTextarea"
-                placeholder="https://example.com/news/article&#10;または&#10;記事タイトルをそのまま貼り付け（1行1件）"></textarea>
-      <div class="kw-count" id="feedbackStatus"></div>
-      <button class="btn-save-kw" onclick="saveFeedback()">保存（GitHub）</button>
     </div>
   </div>
 </div>
@@ -867,9 +876,9 @@ async function saveFeedback() {
     const newContent = existing ? existing + "\n" + content : content;
     const { ok: putOk } = await ghPut("feedback.txt", newContent, sha, "📌 フィードバック追加");
     if (putOk) {
-      status.textContent = "✅ 保存しました（週次処理で学習されます）";
       document.getElementById("feedbackTextarea").value = "";
       showToast("フィードバックを保存しました");
+      setTimeout(() => closeFeedback(), 400);
     } else {
       status.textContent = "❌ 保存に失敗しました";
       showToast("保存に失敗しました");
@@ -1326,6 +1335,16 @@ function renderTrashModal() {
 function openTrash()             { renderTrashModal(); document.getElementById("trashBackdrop").classList.add("open"); document.body.style.overflow = "hidden"; }
 function closeTrash()            { document.getElementById("trashBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
 function closeTrashOnBackdrop(e) { if (e.target === document.getElementById("trashBackdrop")) closeTrash(); }
+
+// ===== フィードバックモーダル =====
+function openFeedback() {
+  document.getElementById("feedbackStatus").textContent = "";
+  document.getElementById("feedbackBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => document.getElementById("feedbackTextarea").focus(), 300);
+}
+function closeFeedback()            { document.getElementById("feedbackBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeFeedbackOnBackdrop(e) { if (e.target === document.getElementById("feedbackBackdrop")) closeFeedback(); }
 
 // ===== 設定モーダル =====
 function openSettings() {
