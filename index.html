@@ -367,7 +367,7 @@ body {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface2); border-radius: 10px;
   padding: 10px 12px 10px 10px; margin-bottom: 8px;
-  border-left: 3px solid var(--border); opacity: 0.75;
+  border-left: 3px solid var(--border); opacity: 0.88;
 }
 .trash-info { flex: 1; min-width: 0; }
 .trash-meta  { font-size: 10.5px; font-weight: 700; margin-bottom: 3px; }
@@ -508,6 +508,7 @@ body {
 <div class="header" id="headerEl">
   <div class="header-top">
     <div class="header-title">📰 ニュース</div>
+    <button class="btn-settings" title="更新" onclick="location.reload()">🔄</button>
     <button class="btn-settings" title="設定" onclick="openSettings()">⚙</button>
     <span class="header-stats" id="stats"></span>
     <button class="btn btn-select" id="btnSelectAll" onclick="toggleSelectAll()">全選択</button>
@@ -977,9 +978,10 @@ function getFiltered() {
   });
 }
 function getDeleted() {
+  const orderMap = new Map([...deletedIds].map((id, i) => [id, i]));
   return allArticles
     .filter(a => deletedIds.has(a.id))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => orderMap.get(b.id) - orderMap.get(a.id));
 }
 
 function setCategory(cat) { activeCat = cat; selectedIds.clear(); render(); }
