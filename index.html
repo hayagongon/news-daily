@@ -240,14 +240,18 @@ body {
 .swipe-wrapper:hover { box-shadow: var(--card-hover); transform: translateY(-1px); }
 .swipe-del-btn {
   position: absolute;
-  right: 0; top: 0; bottom: 0; width: 72px;
+  top: 0; bottom: 0; width: 72px;
   background: #e74c3c; color: #fff;
   border: none; cursor: pointer;
   font-size: 12px; font-weight: 700;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 4px;
   user-select: none; -webkit-user-select: none;
+  transition: background 0.15s;
 }
+.swipe-del-right { right: 0; }
+.swipe-del-left  { left: 0; }
+.swipe-del-btn.full-swipe { background: #c0392b; }
 .swipe-del-btn:active { background: #c0392b; }
 @media (min-width: 760px) { .swipe-del-btn { display: none; } }
 
@@ -1048,8 +1052,7 @@ async function deleteSelected() {
 }
 
 // ===== スワイプ削除（モバイル） =====
-async function swipeDeleteCard(id, e) {
-  e.stopPropagation();
+async function doDelete(id) {
   const article = allArticles.find(a => a.id === id);
   if (!article) return;
   const meta = [{ title: article.title, cat: article.cat, src: article.src, date: todayStr() }];
@@ -1061,10 +1064,14 @@ async function swipeDeleteCard(id, e) {
   await syncDeleted();
   syncDeletedLog(meta);
 }
+async function swipeDeleteCard(id, e) {
+  e.stopPropagation();
+  await doDelete(id);
+}
 
 function initSwipe() {
   if (!("ontouchstart" in window)) return;
-  const SNAP = 72, THRESHOLD = 40;
+  const SNAP = 72, THRESHOLD = 40, FULL = 160;
   let openWrapper = null;
 
   function closeOpen() {
@@ -1072,45 +1079,64 @@ function initSwipe() {
     const c = openWrapper.querySelector(".card");
     c.style.transition = "transform 0.2s ease";
     c.style.transform = "translateX(0)";
+    openWrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.remove("full-swipe"));
     openWrapper.classList.remove("swiped");
     openWrapper = null;
   }
 
   document.querySelectorAll(".swipe-wrapper").forEach(wrapper => {
     const card = wrapper.querySelector(".card");
-    let startX = 0, startY = 0, dx = 0;
-    let direction = null; // "h"=horizontal, "v"=vertical, null=undecided
+    const id = card.id.slice(5); // "card-" を除いた記事ID
+    let startX = 0, startY = 0, dx = 0, rawMoveX = 0, direction = null;
 
     wrapper.addEventListener("touchstart", e => {
       if (openWrapper && openWrapper !== wrapper) closeOpen();
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      dx = 0;
-      direction = null;
+      dx = 0; rawMoveX = 0; direction = null;
       card.style.transition = "none";
     }, { passive: true });
 
     wrapper.addEventListener("touchmove", e => {
       const curX = e.touches[0].clientX;
       const curY = e.touches[0].clientY;
-      const moveX = curX - startX;
+      rawMoveX = curX - startX;
       const moveY = curY - startY;
 
-      // 方向未確定のとき、8px以上動いたら判定
-      if (direction === null && (Math.abs(moveX) > 8 || Math.abs(moveY) > 8)) {
-        direction = Math.abs(moveX) > Math.abs(moveY) ? "h" : "v";
+      if (direction === null && (Math.abs(rawMoveX) > 8 || Math.abs(moveY) > 8)) {
+        direction = Math.abs(rawMoveX) > Math.abs(moveY) ? "h" : "v";
       }
-      if (direction !== "h") return; // 縦スクロール中は無視
+      if (direction !== "h") return;
 
-      dx = Math.max(-SNAP, Math.min(0, moveX));
+      dx = Math.max(-SNAP, Math.min(SNAP, rawMoveX));
       card.style.transform = `translateX(${dx}px)`;
+
+      // フルスワイプ視覚フィードバック
+      const isFull = Math.abs(rawMoveX) >= FULL;
+      wrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.toggle("full-swipe", isFull));
     }, { passive: true });
 
     wrapper.addEventListener("touchend", () => {
-      if (direction !== "h") return; // 縦スクロールで終わった場合はリセットのみ
+      if (direction !== "h") return;
+      wrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.remove("full-swipe"));
+
+      // フルスワイプ → 即削除
+      if (Math.abs(rawMoveX) >= FULL) {
+        card.style.transition = "transform 0.15s ease-in";
+        card.style.transform = `translateX(${rawMoveX > 0 ? "120%" : "-120%"})`;
+        if (openWrapper === wrapper) openWrapper = null;
+        wrapper.classList.remove("swiped");
+        setTimeout(() => doDelete(id), 150);
+        return;
+      }
+
       card.style.transition = "transform 0.2s ease";
       if (dx < -THRESHOLD) {
         card.style.transform = `translateX(-${SNAP}px)`;
+        wrapper.classList.add("swiped");
+        openWrapper = wrapper;
+      } else if (dx > THRESHOLD) {
+        card.style.transform = `translateX(${SNAP}px)`;
         wrapper.classList.add("swiped");
         openWrapper = wrapper;
       } else {
@@ -1232,7 +1258,10 @@ function renderCards() {
       const col = catColor(a.cat);
       const sel = selectedIds.has(a.id);
       return `<div class="swipe-wrapper">
-      <button class="swipe-del-btn" onclick="swipeDeleteCard('${a.id}',event)">
+      <button class="swipe-del-btn swipe-del-left" onclick="swipeDeleteCard('${a.id}',event)">
+        <span style="font-size:18px">🗑</span><span>削除</span>
+      </button>
+      <button class="swipe-del-btn swipe-del-right" onclick="swipeDeleteCard('${a.id}',event)">
         <span style="font-size:18px">🗑</span><span>削除</span>
       </button>
       <div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
