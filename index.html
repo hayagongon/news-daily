@@ -1071,7 +1071,7 @@ async function swipeDeleteCard(id, e) {
 
 function initSwipe() {
   if (!("ontouchstart" in window)) return;
-  const SNAP = 72, THRESHOLD = 40, FULL = 160;
+  const SNAP = 72, THRESHOLD = 40, FULL = 120;
   let openWrapper = null;
 
   function closeOpen() {
