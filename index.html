@@ -230,15 +230,34 @@ body {
 .date-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
 /* ===== カード ===== */
+.swipe-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.swipe-wrapper:hover { box-shadow: var(--card-hover); transform: translateY(-1px); }
+.swipe-del-btn {
+  position: absolute;
+  right: 0; top: 0; bottom: 0; width: 72px;
+  background: #e74c3c; color: #fff;
+  border: none; cursor: pointer;
+  font-size: 12px; font-weight: 700;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  user-select: none; -webkit-user-select: none;
+}
+.swipe-del-btn:active { background: #c0392b; }
+@media (min-width: 760px) { .swipe-del-btn { display: none; } }
+
 .card {
   background: var(--surface); border-radius: 12px;
   display: flex; align-items: stretch; flex-direction: column;
-  box-shadow: var(--card-shadow);
-  transition: box-shadow 0.15s, transform 0.15s, border-color 0.1s, background 0.1s;
+  transition: border-color 0.1s, background 0.1s;
   overflow: hidden; cursor: pointer; border: 2px solid transparent;
   -webkit-tap-highlight-color: transparent;
 }
-.card:hover  { box-shadow: var(--card-hover); transform: translateY(-1px); }
 .card:active { transform: scale(0.99); }
 .card.selected { border-color: var(--sel-border); background: var(--sel-bg); }
 
@@ -647,6 +666,7 @@ const CAT_COLOR = {
 const CAT_SHORT = { "芸能・エンタメ・ゴシップ": "エンタメ" };
 
 // ===== 状態 =====
+let _swipeJustClosed = false;
 let allArticles     = [];
 let deletedIds      = new Set();
 let aiExcludedIds   = new Set();   // AI フィルタリングで除外された記事ID
@@ -983,9 +1003,17 @@ function resetFilters() {
 
 // ===== 選択 =====
 function toggleSelect(id, e) {
+  if (_swipeJustClosed) { _swipeJustClosed = false; return; }
   if (e && e.target.closest("a, button")) return;
-  selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
   const card = document.getElementById("card-" + id);
+  const wrapper = card?.closest(".swipe-wrapper");
+  if (wrapper?.classList.contains("swiped")) {
+    wrapper.classList.remove("swiped");
+    card.style.transition = "transform 0.2s ease";
+    card.style.transform = "translateX(0)";
+    return;
+  }
+  selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
   if (card) card.classList.toggle("selected", selectedIds.has(id));
   updateHeader();
 }
@@ -1013,6 +1041,70 @@ async function deleteSelected() {
   showToast(`${count}件を削除しました`);
   await syncDeleted();
   syncDeletedLog(meta);  // fire-and-forget（UIをブロックしない）
+}
+
+// ===== スワイプ削除（モバイル） =====
+async function swipeDeleteCard(id, e) {
+  e.stopPropagation();
+  const article = allArticles.find(a => a.id === id);
+  if (!article) return;
+  const meta = [{ title: article.title, cat: article.cat, src: article.src, date: todayStr() }];
+  selectedIds.delete(id);
+  deletedIds.add(id);
+  saveLocalDeleted(deletedIds);
+  render();
+  showToast("1件を削除しました");
+  await syncDeleted();
+  syncDeletedLog(meta);
+}
+
+function initSwipe() {
+  if (!("ontouchstart" in window)) return;
+  const SNAP = 72, THRESHOLD = 40;
+  let openWrapper = null;
+
+  function closeOpen() {
+    if (!openWrapper) return;
+    const c = openWrapper.querySelector(".card");
+    c.style.transition = "transform 0.2s ease";
+    c.style.transform = "translateX(0)";
+    openWrapper.classList.remove("swiped");
+    openWrapper = null;
+  }
+
+  document.querySelectorAll(".swipe-wrapper").forEach(wrapper => {
+    const card = wrapper.querySelector(".card");
+    let startX = 0, dx = 0;
+
+    wrapper.addEventListener("touchstart", e => {
+      if (openWrapper && openWrapper !== wrapper) closeOpen();
+      startX = e.touches[0].clientX;
+      dx = 0;
+      card.style.transition = "none";
+    }, { passive: true });
+
+    wrapper.addEventListener("touchmove", e => {
+      dx = Math.max(-SNAP, Math.min(0, e.touches[0].clientX - startX));
+      card.style.transform = `translateX(${dx}px)`;
+    }, { passive: true });
+
+    wrapper.addEventListener("touchend", () => {
+      card.style.transition = "transform 0.2s ease";
+      if (dx < -THRESHOLD) {
+        card.style.transform = `translateX(-${SNAP}px)`;
+        wrapper.classList.add("swiped");
+        openWrapper = wrapper;
+      } else {
+        if (wrapper.classList.contains("swiped")) {
+          _swipeJustClosed = true;
+          setTimeout(() => _swipeJustClosed = false, 500);
+        }
+        card.style.transform = "translateX(0)";
+        wrapper.classList.remove("swiped");
+        if (openWrapper === wrapper) openWrapper = null;
+      }
+    });
+  });
 }
 
 // ===== 復元 =====
@@ -1120,7 +1212,8 @@ function renderCards() {
     const cards = byDate[date].map(a => {
       const col = catColor(a.cat);
       const sel = selectedIds.has(a.id);
-      return `<div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
+      return `<div class="swipe-wrapper">
+      <div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
         <div class="card-bar" style="background:${col}"></div>
         <div class="card-inner">
         <div class="card-check">
@@ -1147,10 +1240,15 @@ function renderCards() {
           </div>
         </div>
         </div>
+      </div>
+      <button class="swipe-del-btn" onclick="swipeDeleteCard('${a.id}',event)">
+        <span style="font-size:18px">🗑</span><span>削除</span>
+      </button>
       </div>`;
     }).join("");
     return `<div class="date-header">${toDateLabel(date)}</div><div class="cards-grid">${cards}</div>`;
   }).join("");
+  initSwipe();
 }
 
 // ===== ゴミ箱フローティングボタン更新 =====
