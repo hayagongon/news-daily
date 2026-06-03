@@ -1213,6 +1213,9 @@ function renderCards() {
       const col = catColor(a.cat);
       const sel = selectedIds.has(a.id);
       return `<div class="swipe-wrapper">
+      <button class="swipe-del-btn" onclick="swipeDeleteCard('${a.id}',event)">
+        <span style="font-size:18px">🗑</span><span>削除</span>
+      </button>
       <div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
         <div class="card-bar" style="background:${col}"></div>
         <div class="card-inner">
@@ -1241,9 +1244,6 @@ function renderCards() {
         </div>
         </div>
       </div>
-      <button class="swipe-del-btn" onclick="swipeDeleteCard('${a.id}',event)">
-        <span style="font-size:18px">🗑</span><span>削除</span>
-      </button>
       </div>`;
     }).join("");
     return `<div class="date-header">${toDateLabel(date)}</div><div class="cards-grid">${cards}</div>`;
