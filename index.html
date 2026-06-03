@@ -367,7 +367,7 @@ body {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface2); border-radius: 10px;
   padding: 10px 12px 10px 10px; margin-bottom: 8px;
-  border-left: 3px solid var(--border); opacity: 0.88;
+  border-left: 3px solid var(--border); opacity: 0.95;
 }
 .trash-info { flex: 1; min-width: 0; }
 .trash-meta  { font-size: 10.5px; font-weight: 700; margin-bottom: 3px; }
@@ -1078,21 +1078,36 @@ function initSwipe() {
 
   document.querySelectorAll(".swipe-wrapper").forEach(wrapper => {
     const card = wrapper.querySelector(".card");
-    let startX = 0, dx = 0;
+    let startX = 0, startY = 0, dx = 0;
+    let direction = null; // "h"=horizontal, "v"=vertical, null=undecided
 
     wrapper.addEventListener("touchstart", e => {
       if (openWrapper && openWrapper !== wrapper) closeOpen();
       startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
       dx = 0;
+      direction = null;
       card.style.transition = "none";
     }, { passive: true });
 
     wrapper.addEventListener("touchmove", e => {
-      dx = Math.max(-SNAP, Math.min(0, e.touches[0].clientX - startX));
+      const curX = e.touches[0].clientX;
+      const curY = e.touches[0].clientY;
+      const moveX = curX - startX;
+      const moveY = curY - startY;
+
+      // 方向未確定のとき、8px以上動いたら判定
+      if (direction === null && (Math.abs(moveX) > 8 || Math.abs(moveY) > 8)) {
+        direction = Math.abs(moveX) > Math.abs(moveY) ? "h" : "v";
+      }
+      if (direction !== "h") return; // 縦スクロール中は無視
+
+      dx = Math.max(-SNAP, Math.min(0, moveX));
       card.style.transform = `translateX(${dx}px)`;
     }, { passive: true });
 
     wrapper.addEventListener("touchend", () => {
+      if (direction !== "h") return; // 縦スクロールで終わった場合はリセットのみ
       card.style.transition = "transform 0.2s ease";
       if (dx < -THRESHOLD) {
         card.style.transform = `translateX(-${SNAP}px)`;
