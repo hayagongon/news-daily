@@ -118,7 +118,6 @@ body {
 #headerEl.select-mode #selectStatus     { display: block; }
 #headerEl.select-mode #btnTrashSelect   { display: inline-flex; }
 #headerEl.select-mode #selectCountText  { display: inline-flex; }
-#headerEl.select-mode #btnSelectAllLink { display: inline-flex; }
 
 /* ===== フィルターバー（カテゴリタブ） ===== */
 .filter-bar {
@@ -219,15 +218,6 @@ body {
   display: none;
   font-size: 12.5px; color: var(--text-sub); font-weight: 600;
 }
-.select-all-link {
-  display: none;
-  margin-left: auto;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 14px; padding: 4px 12px; cursor: pointer; font-family: inherit;
-  font-size: 12.5px; font-weight: 600; color: var(--text-sub); transition: all 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.select-all-link:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.16); }
 
 /* ===== ローディング ===== */
 .loading-state {
@@ -644,7 +634,6 @@ body.select-mode .card-check { display: flex; }
     <button class="search-close-btn" id="btnSearchClose" onclick="exitSearchMode()">✕ 閉じる</button>
 
     <span class="select-count-text" id="selectCountText">全0件</span>
-    <button class="select-all-link" id="btnSelectAllLink" onclick="toggleSelectAll()">全選択</button>
   </div>
 </div>
 
@@ -839,6 +828,7 @@ let detailArticleId = null;
 let trashSortMode   = "deleted"; // "deleted"=削除した日付順 "article"=記事の日付順
 let reviewedDates   = new Set(); // 確認済みにした日付（YYYY-MM-DD）
 let calYear, calMonth; // カレンダーモーダルで表示中の年月（0始まり月）
+let cardsNeedRefresh = false; // ゴミ箱モーダルを閉じる際に renderCards() が必要か
 
 // ===== AI 除外ID 読み込み =====
 async function loadAiExcluded() {
@@ -1291,27 +1281,22 @@ function closeDetail() {
 }
 function closeDetailOnBackdrop(e) { if (e.target === document.getElementById("detailBackdrop")) closeDetail(); }
 
-function toggleSelectAll() {
-  const visible    = getFiltered().map(a => a.id);
-  const allChecked = visible.length > 0 && visible.every(id => selectedIds.has(id));
-  if (allChecked) visible.forEach(id => selectedIds.delete(id));
-  else            visible.forEach(id => selectedIds.add(id));
-  renderCards();
-  updateHeader();
-}
-
 // ===== 削除 =====
 async function deleteSelected() {
   const count = selectedIds.size;
   if (!count) return;
   // メタデータを先に収集（selectedIds.clear() 前に）
+  const ids  = [...selectedIds];
   const meta = allArticles
     .filter(a => selectedIds.has(a.id))
     .map(a => ({ title: a.title, cat: a.cat, src: a.src, date: todayStr() }));
   selectedIds.forEach(id => deletedIds.add(id));
   selectedIds.clear();
   saveLocalDeleted(deletedIds);
-  render();
+  removeCardElements(ids);
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   showToast(`${count}件を削除しました`);
   await syncDeleted();
   syncDeletedLog(meta);  // fire-and-forget（UIをブロックしない）
@@ -1325,10 +1310,40 @@ async function doDelete(id) {
   selectedIds.delete(id);
   deletedIds.add(id);
   saveLocalDeleted(deletedIds);
-  render();
+  removeCardElements([id]);
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   showToast("1件を削除しました");
   await syncDeleted();
   syncDeletedLog(meta);
+}
+
+// ===== カード要素を直接削除（全件再描画を避ける軽量更新） =====
+function removeCardElements(ids) {
+  const list = document.getElementById("newsList");
+  const affectedGrids = new Set();
+  let removedAny = false;
+  ids.forEach(id => {
+    const card = document.getElementById("card-" + id);
+    const wrapper = card && card.closest(".swipe-wrapper");
+    if (!wrapper) return;
+    const grid = wrapper.parentElement;
+    if (grid) affectedGrids.add(grid);
+    wrapper.remove();
+    removedAny = true;
+  });
+  if (!removedAny) return;
+  // 空になった日付グループ（見出し＋カードグリッド）を削除
+  affectedGrids.forEach(grid => {
+    if (grid.children.length === 0) {
+      const header = grid.previousElementSibling;
+      if (header && header.classList.contains("date-header")) header.remove();
+      grid.remove();
+    }
+  });
+  // 表示中の記事が0件になった場合は通常の再描画で空状態を表示
+  if (list.children.length === 0) renderCards();
 }
 function initSwipe() {
   if (!("ontouchstart" in window)) return;
@@ -1387,7 +1402,10 @@ function initSwipe() {
 async function restore(id) {
   deletedIds.delete(id);
   saveLocalDeleted(deletedIds);
-  render();
+  cardsNeedRefresh = true; // モーダルを閉じる際に一覧を再描画
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   renderTrashModal();
   if (getDeleted().length === 0) closeTrash();
   showToast("記事を復元しました");
@@ -1418,8 +1436,6 @@ function updateHeader() {
 
   // 選択モードフィルター行
   document.getElementById("selectCountText").textContent = `全${total}件`;
-  const allSel = total > 0 && filtered.every(a => selectedIds.has(a.id));
-  document.getElementById("btnSelectAllLink").textContent = allSel ? "選択解除" : "全選択";
 
   document.querySelectorAll(".chip[data-cat]").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.cat === activeCat);
@@ -1549,7 +1565,14 @@ function renderTrashModal() {
 }
 
 function openTrash()             { renderTrashModal(); document.getElementById("trashBackdrop").classList.add("open"); document.body.style.overflow = "hidden"; }
-function closeTrash()            { document.getElementById("trashBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeTrash() {
+  document.getElementById("trashBackdrop").classList.remove("open");
+  document.body.style.overflow = "";
+  if (cardsNeedRefresh) {
+    renderCards();
+    cardsNeedRefresh = false;
+  }
+}
 function closeTrashOnBackdrop(e) { if (e.target === document.getElementById("trashBackdrop")) closeTrash(); }
 function toggleTrashSort() {
   trashSortMode = trashSortMode === "deleted" ? "article" : "deleted";
