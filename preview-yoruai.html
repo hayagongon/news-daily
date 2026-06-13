@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>📰 ニュース</title>
+<title>📰 ニュースDB(2026年以降)</title>
 <style>
 /* ===== リセット ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -60,10 +60,10 @@ body {
 }
 .header-title-group { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; }
 .header-title { font-size: 20px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
-.header-stats { font-size: 12.5px; color: var(--text-sub); white-space: nowrap; }
 
-/* ヘッダーアイコンボタン（🔄📌⚙） */
+/* ヘッダーアイコンボタン（🗑📌📅⚙） */
 .icon-btn {
+  position: relative;
   background: transparent; border: none; cursor: pointer;
   color: rgba(255,255,255,0.28); font-size: 17px;
   padding: 4px 6px; border-radius: 6px; line-height: 1;
@@ -71,7 +71,14 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .icon-btn:hover { color: var(--text-primary); }
-.icon-btn.spinning { animation: spin 0.8s linear infinite; }
+
+.trash-badge {
+  position: absolute; top: 0; right: 0;
+  background: var(--danger); color: #fff; font-size: 10px; font-weight: 700;
+  min-width: 16px; height: 16px; line-height: 16px; text-align: center;
+  border-radius: 8px; padding: 0 3px;
+}
+.trash-badge.hidden { display: none; }
 
 /* 選択モードヘッダー */
 .select-cancel-btn {
@@ -95,7 +102,7 @@ body {
 
 /* 選択モード切替（ヘッダー） */
 #headerEl.select-mode #titleGroup,
-#headerEl.select-mode #btnReload,
+#headerEl.select-mode #btnTrash,
 #headerEl.select-mode #btnPin,
 #headerEl.select-mode #btnCalendar,
 #headerEl.select-mode #btnGear,
@@ -251,7 +258,7 @@ body {
 }
 
 /* ===== メインコンテンツ ===== */
-.main { max-width: 1280px; margin: 0 auto; padding: 10px 12px 100px; }
+.main { max-width: 1280px; margin: 0 auto; padding: 10px 12px 24px; }
 
 /* ===== カードグリッド（レスポンシブ列） ===== */
 .cards-grid {
@@ -405,24 +412,6 @@ body.select-mode .card-check { display: flex; }
 /* ===== 空状態 ===== */
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; display: none; }
 .empty-icon { font-size: 36px; display: block; margin-bottom: 10px; }
-
-/* ===== ゴミ箱フローティングボタン ===== */
-.trash-fab {
-  position: fixed; bottom: 28px; right: 20px; z-index: 300;
-  display: none; align-items: center; gap: 6px;
-  background: var(--surface); border: 1.5px solid var(--border);
-  color: var(--text-muted); font-size: 13px; font-weight: 600;
-  padding: 9px 14px; border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  cursor: pointer; font-family: inherit; transition: all 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.trash-fab:hover { color: var(--text-secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.2); transform: translateY(-1px); }
-.trash-fab.visible { display: flex; }
-.trash-fab-count {
-  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
-  padding: 2px 7px; border-radius: 10px; min-width: 22px; text-align: center;
-}
 
 /* ===== モーダル共通 ===== */
 .modal-backdrop {
@@ -603,11 +592,10 @@ body.select-mode .card-check { display: flex; }
   .header-top  { padding: 9px 12px; gap: 7px; }
   .header-title { font-size: 16px; }
   .btn         { padding: 7px 11px; font-size: 13px; }
-  .main        { padding: 10px 8px 100px; }
+  .main        { padding: 10px 8px 24px; }
   .cards-grid  { grid-template-columns: 1fr !important; }
   .card-body   { padding: 10px 11px; }
   .card-title  { font-size: 14px; }
-  .trash-fab   { bottom: 20px; right: 14px; }
   .modal-sheet { max-height: 80vh; }
 }
 </style>
@@ -618,10 +606,9 @@ body.select-mode .card-check { display: flex; }
 <div class="header" id="headerEl">
   <div class="header-top" id="headerTop">
     <div class="header-title-group" id="titleGroup">
-      <span class="header-title">ニュース</span>
-      <span class="header-stats" id="stats"></span>
+      <span class="header-title">ニュースDB(2026年以降)</span>
     </div>
-    <button class="icon-btn" id="btnReload" title="更新" onclick="reloadData()">🔄</button>
+    <button class="icon-btn" id="btnTrash" title="削除済み" onclick="openTrash()">🗑<span class="trash-badge" id="trashCount">0</span></button>
     <button class="icon-btn" id="btnPin" title="欲しかった記事を登録" onclick="openFeedback()">📌</button>
     <button class="icon-btn" id="btnCalendar" title="確認状況" onclick="openCalendar()">📅</button>
     <button class="icon-btn" id="btnGear" title="設定" onclick="openSettings()">⚙</button>
@@ -683,11 +670,6 @@ body.select-mode .card-check { display: flex; }
     <span id="emptyText">記事がまだありません</span>
   </div>
 </div>
-
-<!-- ===== ゴミ箱フローティングボタン ===== -->
-<button class="trash-fab" id="trashFab" onclick="openTrash()">
-  🗑 削除済み <span class="trash-fab-count" id="trashCount">0</span>
-</button>
 
 <!-- ===== 記事詳細シート ===== -->
 <div class="modal-backdrop" id="detailBackdrop" onclick="closeDetailOnBackdrop(event)">
@@ -1272,12 +1254,6 @@ function exitSelectMode() {
   updateHeader();
 }
 
-// ===== 再読み込み =====
-function reloadData() {
-  document.getElementById("btnReload").classList.add("spinning");
-  location.reload();
-}
-
 // ===== カードタップ =====
 function onCardTap(id, e) {
   if (_swipeJustClosed) { _swipeJustClosed = false; return; }
@@ -1424,8 +1400,6 @@ function updateHeader() {
   const total    = filtered.length;
   const sel      = selectedIds.size;
 
-  document.getElementById("stats").textContent = `${total}件`;
-
   // カウントバッジ
   const allTotal = allArticles.filter(a => !deletedIds.has(a.id) && !aiExcludedIds.has(a.id)).length;
   const badge = document.getElementById("countBadge");
@@ -1550,12 +1524,12 @@ function renderCards() {
   initSwipe();
 }
 
-// ===== ゴミ箱フローティングボタン更新 =====
-function updateTrashFab() {
-  const n   = getDeleted().length;
-  const fab = document.getElementById("trashFab");
-  fab.classList.toggle("visible", n > 0);
-  document.getElementById("trashCount").textContent = n;
+// ===== 削除済みバッジ更新 =====
+function updateTrashBadge() {
+  const n     = getDeleted().length;
+  const badge = document.getElementById("trashCount");
+  badge.classList.toggle("hidden", n === 0);
+  badge.textContent = n;
 }
 
 // ===== ゴミ箱モーダル描画 =====
@@ -1697,7 +1671,7 @@ function clearPATUI() {
 function render() {
   updateYearMonthSelects();
   renderCards();
-  updateTrashFab();
+  updateTrashBadge();
   updateHeader();
 }
 
