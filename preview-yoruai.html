@@ -111,8 +111,7 @@ body {
 #headerEl.select-mode #monthSelect,
 #headerEl.select-mode #btnSearchToggle,
 #headerEl.select-mode #btnSelectToggle,
-#headerEl.select-mode #sortBtn,
-#headerEl.select-mode #countBadge { display: none; }
+#headerEl.select-mode #sortBtn { display: none; }
 
 #headerEl.select-mode #btnCancelSelect  { display: inline-flex; }
 #headerEl.select-mode #selectStatus     { display: block; }
@@ -145,7 +144,7 @@ body {
 /* ===== フィルター行（年/月/検索/選択/ソート） ===== */
 .search-row {
   display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px 10px; border-top: 1px solid var(--border);
+  padding: 7px 14px 6px; border-top: 1px solid var(--border);
   flex-wrap: wrap;
   max-width: 1280px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
@@ -178,10 +177,6 @@ body {
   font-family: inherit; flex-shrink: 0; white-space: nowrap;
 }
 .sort-btn:hover { background: rgba(74,143,255,0.14); }
-.count-badge {
-  font-size: 11.5px; color: var(--text-sub);
-  flex-shrink: 0; white-space: nowrap; margin-left: auto;
-}
 
 /* 検索モード（フィルター行） */
 .search-mode-icon {
@@ -206,8 +201,7 @@ body {
 #headerEl.search-mode #monthSelect,
 #headerEl.search-mode #btnSearchToggle,
 #headerEl.search-mode #btnSelectToggle,
-#headerEl.search-mode #sortBtn,
-#headerEl.search-mode #countBadge { display: none; }
+#headerEl.search-mode #sortBtn { display: none; }
 
 #headerEl.search-mode #searchModeIcon { display: inline-flex; }
 #headerEl.search-mode #searchInput    { display: block; }
@@ -248,7 +242,7 @@ body {
 }
 
 /* ===== メインコンテンツ ===== */
-.main { max-width: 1280px; margin: 0 auto; padding: 10px 12px 24px; }
+.main { max-width: 1280px; margin: 0 auto; padding: 2px 12px 24px; }
 
 /* ===== カードグリッド（レスポンシブ列） ===== */
 .cards-grid {
@@ -583,7 +577,7 @@ body.select-mode .card-check { visibility: visible; }
   .header-top  { padding: 9px 12px; gap: 7px; }
   .header-title { font-size: 16px; }
   .btn         { padding: 7px 11px; font-size: 13px; }
-  .main        { padding: 10px 8px 24px; }
+  .main        { padding: 2px 8px 24px; }
   .cards-grid  { grid-template-columns: 1fr !important; }
   .card-body   { padding: 10px 11px; }
   .card-title  { font-size: 14px; }
@@ -627,7 +621,6 @@ body.select-mode .card-check { visibility: visible; }
     <button class="icon-square-btn" id="btnSearchToggle" title="検索" onclick="enterSearchMode()">🔍</button>
     <button class="icon-square-btn" id="btnSelectToggle" title="選択" onclick="enterSelectMode()">☐</button>
     <button class="sort-btn" id="sortBtn" onclick="toggleSort()">↓ 新しい順</button>
-    <span class="count-badge" id="countBadge"></span>
 
     <span class="search-mode-icon" id="searchModeIcon">🔍</span>
     <input class="search-input" id="searchInput" type="text" placeholder="タイトルで検索…"
@@ -1442,15 +1435,6 @@ function updateHeader() {
   const filtered = getFiltered();
   const total    = filtered.length;
   const sel      = selectedIds.size;
-
-  // カウントバッジ
-  const allTotal = allArticles.filter(a => !deletedIds.has(a.id) && !aiExcludedIds.has(a.id)).length;
-  const badge = document.getElementById("countBadge");
-  if (badge) {
-    const hasFilter = activeCat !== "全て" || activeYear !== "全て" ||
-                      activeMonth !== "全て" || searchQuery;
-    badge.textContent = hasFilter ? `${total}件 / 全${allTotal}件` : `${total}件`;
-  }
 
   // 選択モードヘッダー
   document.getElementById("selectStatus").textContent =
