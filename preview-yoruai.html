@@ -97,6 +97,7 @@ body {
 #headerEl.select-mode #titleGroup,
 #headerEl.select-mode #btnReload,
 #headerEl.select-mode #btnPin,
+#headerEl.select-mode #btnCalendar,
 #headerEl.select-mode #btnGear,
 #headerEl.select-mode .filter-bar,
 #headerEl.select-mode #yearSelect,
@@ -273,22 +274,47 @@ body {
   letter-spacing: 0.07em; padding: 18px 2px 8px;
 }
 .date-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-.date-header-label { white-space: nowrap; }
-.review-badge {
-  font-size: 10.5px; font-weight: 700; color: var(--accent);
-  background: rgba(74,143,255,0.12); border-radius: 5px;
-  padding: 2px 6px; letter-spacing: 0; flex-shrink: 0;
+
+/* ===== 確認状況カレンダー ===== */
+.cal-nav-btn {
+  background: var(--chip-bg); border: none; color: var(--text-muted);
+  font-size: 16px; font-weight: 700; width: 32px; height: 32px;
+  border-radius: 8px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+  flex-shrink: 0; -webkit-tap-highlight-color: transparent;
 }
-.review-mark-btn {
-  font-size: 11px; font-weight: 600; color: var(--text-sub);
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 6px; padding: 3px 8px; cursor: pointer;
-  font-family: inherit; flex-shrink: 0; white-space: nowrap; letter-spacing: 0;
-  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+.cal-nav-btn:hover { color: var(--text-primary); background: rgba(74,143,255,0.1); }
+.calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted);
+  padding: 4px 0 8px;
 }
-.review-mark-btn:hover {
-  color: var(--text-primary); border-color: rgba(74,143,255,0.3); background: rgba(74,143,255,0.08);
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
 }
+.cal-day {
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text-body);
+}
+.cal-day.empty { color: var(--text-desc); }
+.cal-day.has-articles {
+  background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cal-day.has-articles:hover { background: rgba(74,143,255,0.1); }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-day-mark { font-size: 9px; line-height: 1; color: transparent; }
+.cal-day.pending .cal-day-mark { color: var(--danger); }
+.cal-day.reviewed .cal-day-mark { color: var(--accent); }
+.calendar-legend {
+  display: flex; gap: 18px; justify-content: center;
+  font-size: 11.5px; color: var(--text-sub); padding: 14px 0 6px;
+}
+.cal-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 3px;
+  margin-right: 5px; vertical-align: middle;
+}
+.cal-dot.reviewed { background: var(--accent); }
+.cal-dot.pending { background: var(--danger); }
 
 /* ===== カード ===== */
 .swipe-wrapper {
@@ -597,6 +623,7 @@ body.select-mode .card-check { display: flex; }
     </div>
     <button class="icon-btn" id="btnReload" title="更新" onclick="reloadData()">🔄</button>
     <button class="icon-btn" id="btnPin" title="欲しかった記事を登録" onclick="openFeedback()">📌</button>
+    <button class="icon-btn" id="btnCalendar" title="確認状況" onclick="openCalendar()">📅</button>
     <button class="icon-btn" id="btnGear" title="設定" onclick="openSettings()">⚙</button>
     <button class="select-cancel-btn" id="btnCancelSelect" onclick="exitSelectMode()">キャンセル</button>
     <div class="select-status" id="selectStatus">選択してください</div>
@@ -675,6 +702,28 @@ body.select-mode .card-check { display: flex; }
       <div class="detail-actions">
         <a class="detail-open-btn" id="detailOpenBtn" target="_blank" rel="noopener">原文を開く</a>
         <button class="wayback-btn" id="detailWaybackBtn" title="Webアーカイブで開く">📦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 確認状況カレンダー ===== -->
+<div class="modal-backdrop" id="calendarBackdrop" onclick="closeCalendarOnBackdrop(event)">
+  <div class="modal-sheet" style="max-height:60vh">
+    <div class="modal-header">
+      <button class="cal-nav-btn" onclick="shiftCalendarMonth(-1)">‹</button>
+      <div class="modal-title" id="calendarTitle" style="justify-content:center;color:var(--text-primary);font-size:15px"></div>
+      <button class="cal-nav-btn" onclick="shiftCalendarMonth(1)">›</button>
+      <button class="modal-close" onclick="closeCalendar()">閉じる</button>
+    </div>
+    <div class="modal-body">
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="calendar-legend">
+        <span><span class="cal-dot reviewed"></span>確認済み</span>
+        <span><span class="cal-dot pending"></span>未確認</span>
       </div>
     </div>
   </div>
@@ -806,7 +855,8 @@ let selectMode      = false;
 let searchMode      = false;
 let detailArticleId = null;
 let trashSortMode   = "deleted"; // "deleted"=削除した日付順 "article"=記事の日付順
-let reviewedUntil   = ""; // 確認済みライン（この日付以前は確認済み）
+let reviewedDates   = new Set(); // 確認済みにした日付（YYYY-MM-DD）
+let calYear, calMonth; // カレンダーモーダルで表示中の年月（0始まり月）
 
 // ===== AI 除外ID 読み込み =====
 async function loadAiExcluded() {
@@ -1038,22 +1088,27 @@ async function syncDeleted() {
   }
 }
 
-// ===== 確認済みライン（しおり）の保存 =====
+// ===== 確認済み日付の保存 =====
 function loadLocalReviewed() {
-  return localStorage.getItem("reviewedUntil") || "";
+  try { return JSON.parse(localStorage.getItem("reviewedDates") || "[]"); }
+  catch { return []; }
 }
-function saveLocalReviewed(date) {
-  localStorage.setItem("reviewedUntil", date);
+function saveLocalReviewed(dates) {
+  localStorage.setItem("reviewedDates", JSON.stringify([...dates]));
 }
 
 async function loadRemoteReviewed() {
   try {
     const { ok, data } = await ghContents("review-progress.json");
-    if (!ok || !data || !data.content) return { reviewedUntil: "", sha: null };
+    if (!ok || !data || !data.content) return { dates: [], until: null, sha: null };
     const obj = JSON.parse(atob(data.content.replace(/\n/g, "")));
-    return { reviewedUntil: obj.reviewedUntil || "", sha: data.sha };
+    return {
+      dates: Array.isArray(obj.reviewedDates) ? obj.reviewedDates : [],
+      until: typeof obj.reviewedUntil === "string" ? obj.reviewedUntil : null,
+      sha: data.sha,
+    };
   } catch {
-    return { reviewedUntil: "", sha: null };
+    return { dates: [], until: null, sha: null };
   }
 }
 
@@ -1063,20 +1118,21 @@ async function syncReviewed() {
     const { sha } = await loadRemoteReviewed();
     await ghPut(
       "review-progress.json",
-      JSON.stringify({ reviewedUntil }, null, 2),
+      JSON.stringify({ reviewedDates: [...reviewedDates] }, null, 2),
       sha,
-      `✅ 確認済みライン: ${reviewedUntil}`
+      `✅ 確認状況の更新 (${reviewedDates.size}日)`
     );
   } catch (e) {
     console.warn("GitHub同期に失敗:", e.message);
   }
 }
 
-function markReviewed(date) {
-  reviewedUntil = date;
-  saveLocalReviewed(reviewedUntil);
+function toggleReviewed(date) {
+  if (reviewedDates.has(date)) reviewedDates.delete(date);
+  else reviewedDates.add(date);
+  saveLocalReviewed(reviewedDates);
   syncReviewed();
-  renderCards();
+  renderCalendar();
 }
 
 // ===== 記事の読み込み =====
@@ -1109,10 +1165,25 @@ async function init() {
     deletedIds  = new Set([...local, ...remote.ids]);
     saveLocalDeleted(deletedIds);
 
-    // ローカル + リモートの確認済みラインをマージ（新しい方を採用）
+    // ローカル + リモートの確認済み日付をマージ
     const localReviewed = loadLocalReviewed();
-    reviewedUntil = [localReviewed, remoteReviewed.reviewedUntil].sort().pop() || "";
-    saveLocalReviewed(reviewedUntil);
+    reviewedDates = new Set([...localReviewed, ...remoteReviewed.dates]);
+
+    // 旧バージョン（確認済みライン方式）からの移行
+    const oldUntil = localStorage.getItem("reviewedUntil");
+    let migrated = false;
+    if (oldUntil) {
+      allArticles.forEach(a => { if (a.date <= oldUntil) reviewedDates.add(a.date); });
+      localStorage.removeItem("reviewedUntil");
+      migrated = true;
+    }
+    if (remoteReviewed.until) {
+      allArticles.forEach(a => { if (a.date <= remoteReviewed.until) reviewedDates.add(a.date); });
+      migrated = true;
+    }
+
+    saveLocalReviewed(reviewedDates);
+    if (migrated) syncReviewed();
 
   } catch (e) {
     document.getElementById("loadingState").style.display = "none";
@@ -1442,10 +1513,6 @@ function renderCards() {
     sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b)
   );
 
-  // 確認済みラインの表示は、フィルターなしの全件表示時のみ
-  const filtersActive = activeCat !== "全て" || activeYear !== "全て" ||
-    activeMonth !== "全て" || searchQuery !== "";
-
   list.innerHTML = sortedDates.map(date => {
     const cards = byDate[date].map(a => {
       const col = catColor(a.cat);
@@ -1478,15 +1545,7 @@ function renderCards() {
       </div>
       </div>`;
     }).join("");
-    let reviewExtra = "";
-    if (!filtersActive) {
-      const isPending = reviewedUntil !== "" && date > reviewedUntil;
-      if (isPending || reviewedUntil === "") {
-        const badge = isPending ? `<span class="review-badge">未確認</span>` : "";
-        reviewExtra = `${badge}<button class="review-mark-btn" onclick="markReviewed('${date}')">✓ 確認済みにする</button>`;
-      }
-    }
-    return `<div class="date-header"><span class="date-header-label">${toDateLabel(date)}</span>${reviewExtra}</div><div class="cards-grid">${cards}</div>`;
+    return `<div class="date-header">${toDateLabel(date)}</div><div class="cards-grid">${cards}</div>`;
   }).join("");
   initSwipe();
 }
@@ -1550,6 +1609,57 @@ function openSettings() {
 }
 function closeSettings()            { document.getElementById("settingsBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
 function closeSettingsOnBackdrop(e) { if (e.target === document.getElementById("settingsBackdrop")) closeSettings(); }
+
+// ===== 確認状況カレンダー =====
+function openCalendar() {
+  if (calYear === undefined) {
+    const t = new Date();
+    calYear  = t.getFullYear();
+    calMonth = t.getMonth();
+  }
+  renderCalendar();
+  document.getElementById("calendarBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeCalendar()            { document.getElementById("calendarBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeCalendarOnBackdrop(e) { if (e.target === document.getElementById("calendarBackdrop")) closeCalendar(); }
+
+function shiftCalendarMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById("calendarTitle").textContent = `${calYear}年${calMonth + 1}月`;
+
+  const articleDates = new Set(allArticles.map(a => a.date));
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  const firstDay  = new Date(calYear, calMonth, 1).getDay();
+  const lastDate  = new Date(calYear, calMonth + 1, 0).getDate();
+
+  let cells = "";
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-day empty"></div>`;
+  for (let d = 1; d <= lastDate; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const hasArticles = articleDates.has(dateStr);
+    let cls = "cal-day";
+    if (!hasArticles) cls += " empty";
+    else {
+      cls += " has-articles";
+      cls += reviewedDates.has(dateStr) ? " reviewed" : " pending";
+    }
+    if (dateStr === todayStr) cls += " today";
+    const mark = hasArticles ? (reviewedDates.has(dateStr) ? "✓" : "●") : "";
+    const onclick = hasArticles ? ` onclick="toggleReviewed('${dateStr}')"` : "";
+    cells += `<div class="${cls}"${onclick}>${d}<span class="cal-day-mark">${mark}</span></div>`;
+  }
+
+  document.getElementById("calendarGrid").innerHTML = cells;
+}
 
 function updatePatStatus() {
   const el  = document.getElementById("patStatus");
