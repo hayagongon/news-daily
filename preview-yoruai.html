@@ -273,6 +273,22 @@ body {
   letter-spacing: 0.07em; padding: 18px 2px 8px;
 }
 .date-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.date-header-label { white-space: nowrap; }
+.review-badge {
+  font-size: 10.5px; font-weight: 700; color: var(--accent);
+  background: rgba(74,143,255,0.12); border-radius: 5px;
+  padding: 2px 6px; letter-spacing: 0; flex-shrink: 0;
+}
+.review-mark-btn {
+  font-size: 11px; font-weight: 600; color: var(--text-sub);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 3px 8px; cursor: pointer;
+  font-family: inherit; flex-shrink: 0; white-space: nowrap; letter-spacing: 0;
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.review-mark-btn:hover {
+  color: var(--text-primary); border-color: rgba(74,143,255,0.3); background: rgba(74,143,255,0.08);
+}
 
 /* ===== カード ===== */
 .swipe-wrapper {
@@ -790,6 +806,7 @@ let selectMode      = false;
 let searchMode      = false;
 let detailArticleId = null;
 let trashSortMode   = "deleted"; // "deleted"=削除した日付順 "article"=記事の日付順
+let reviewedUntil   = ""; // 確認済みライン（この日付以前は確認済み）
 
 // ===== AI 除外ID 読み込み =====
 async function loadAiExcluded() {
@@ -1021,6 +1038,47 @@ async function syncDeleted() {
   }
 }
 
+// ===== 確認済みライン（しおり）の保存 =====
+function loadLocalReviewed() {
+  return localStorage.getItem("reviewedUntil") || "";
+}
+function saveLocalReviewed(date) {
+  localStorage.setItem("reviewedUntil", date);
+}
+
+async function loadRemoteReviewed() {
+  try {
+    const { ok, data } = await ghContents("review-progress.json");
+    if (!ok || !data || !data.content) return { reviewedUntil: "", sha: null };
+    const obj = JSON.parse(atob(data.content.replace(/\n/g, "")));
+    return { reviewedUntil: obj.reviewedUntil || "", sha: data.sha };
+  } catch {
+    return { reviewedUntil: "", sha: null };
+  }
+}
+
+async function syncReviewed() {
+  if (!PAT.get()) return;
+  try {
+    const { sha } = await loadRemoteReviewed();
+    await ghPut(
+      "review-progress.json",
+      JSON.stringify({ reviewedUntil }, null, 2),
+      sha,
+      `✅ 確認済みライン: ${reviewedUntil}`
+    );
+  } catch (e) {
+    console.warn("GitHub同期に失敗:", e.message);
+  }
+}
+
+function markReviewed(date) {
+  reviewedUntil = date;
+  saveLocalReviewed(reviewedUntil);
+  syncReviewed();
+  renderCards();
+}
+
 // ===== 記事の読み込み =====
 async function fetchArticles() {
   // GitHub Pages 経由でキャッシュを回避して取得
@@ -1036,10 +1094,11 @@ async function init() {
   document.getElementById("mainContent").style.display  = "none";
 
   try {
-    const [articles, remote, aiExcluded] = await Promise.all([
+    const [articles, remote, aiExcluded, remoteReviewed] = await Promise.all([
       fetchArticles(),
       loadRemoteDeleted(),
       loadAiExcluded(),
+      loadRemoteReviewed(),
     ]);
 
     allArticles   = Array.isArray(articles) ? articles : [];
@@ -1049,6 +1108,11 @@ async function init() {
     const local = loadLocalDeleted();
     deletedIds  = new Set([...local, ...remote.ids]);
     saveLocalDeleted(deletedIds);
+
+    // ローカル + リモートの確認済みラインをマージ（新しい方を採用）
+    const localReviewed = loadLocalReviewed();
+    reviewedUntil = [localReviewed, remoteReviewed.reviewedUntil].sort().pop() || "";
+    saveLocalReviewed(reviewedUntil);
 
   } catch (e) {
     document.getElementById("loadingState").style.display = "none";
@@ -1378,6 +1442,10 @@ function renderCards() {
     sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b)
   );
 
+  // 確認済みラインの表示は、フィルターなしの全件表示時のみ
+  const filtersActive = activeCat !== "全て" || activeYear !== "全て" ||
+    activeMonth !== "全て" || searchQuery !== "";
+
   list.innerHTML = sortedDates.map(date => {
     const cards = byDate[date].map(a => {
       const col = catColor(a.cat);
@@ -1410,7 +1478,15 @@ function renderCards() {
       </div>
       </div>`;
     }).join("");
-    return `<div class="date-header">${toDateLabel(date)}</div><div class="cards-grid">${cards}</div>`;
+    let reviewExtra = "";
+    if (!filtersActive) {
+      const isPending = reviewedUntil !== "" && date > reviewedUntil;
+      if (isPending || reviewedUntil === "") {
+        const badge = isPending ? `<span class="review-badge">未確認</span>` : "";
+        reviewExtra = `${badge}<button class="review-mark-btn" onclick="markReviewed('${date}')">✓ 確認済みにする</button>`;
+      }
+    }
+    return `<div class="date-header"><span class="date-header-label">${toDateLabel(date)}</span>${reviewExtra}</div><div class="cards-grid">${cards}</div>`;
   }).join("");
   initSwipe();
 }
