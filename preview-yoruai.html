@@ -1025,6 +1025,20 @@ async function saveFeedback() {
   }
 }
 
+// ===== フィルター状態の保存・復元（前回表示したフィルタを引き継ぐ） =====
+function loadFilterState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("filterState") || "{}");
+    if (typeof saved.activeCat   === "string") activeCat   = saved.activeCat;
+    if (typeof saved.activeYear  === "string") activeYear  = saved.activeYear;
+    if (typeof saved.activeMonth === "string") activeMonth = saved.activeMonth;
+    if (saved.sortOrder === "asc" || saved.sortOrder === "desc") sortOrder = saved.sortOrder;
+  } catch {}
+}
+function saveFilterState() {
+  localStorage.setItem("filterState", JSON.stringify({ activeCat, activeYear, activeMonth, sortOrder }));
+}
+
 // ===== 削除済みID の保存 =====
 function loadLocalDeleted() {
   try { return JSON.parse(localStorage.getItem("deletedIds") || "[]"); }
@@ -1122,6 +1136,9 @@ async function init() {
   document.getElementById("errorState").style.display   = "none";
   document.getElementById("mainContent").style.display  = "none";
 
+  loadFilterState();
+  updateSortBtnLabel();
+
   try {
     const [articles, remote, aiExcluded, remoteReviewed] = await Promise.all([
       fetchArticles(),
@@ -1204,14 +1221,18 @@ function getDeleted() {
   return list.sort((a, b) => orderMap.get(b.id) - orderMap.get(a.id));
 }
 
-function setCategory(cat) { activeCat = cat; selectedIds.clear(); render(); }
-function setYear(val)  { activeYear  = val; activeMonth = "全て"; selectedIds.clear(); render(); }
-function setMonth(val) { activeMonth = val; selectedIds.clear(); render(); }
+function setCategory(cat) { activeCat = cat; selectedIds.clear(); saveFilterState(); render(); }
+function setYear(val)  { activeYear  = val; activeMonth = "全て"; selectedIds.clear(); saveFilterState(); render(); }
+function setMonth(val) { activeMonth = val; selectedIds.clear(); saveFilterState(); render(); }
 function setSearch(val){ searchQuery = val.trim(); render(); }
-function toggleSort() {
-  sortOrder = sortOrder === "desc" ? "asc" : "desc";
+function updateSortBtnLabel() {
   document.getElementById("sortBtn").textContent =
     sortOrder === "desc" ? "↓ 新しい順" : "↑ 古い順";
+}
+function toggleSort() {
+  sortOrder = sortOrder === "desc" ? "asc" : "desc";
+  updateSortBtnLabel();
+  saveFilterState();
   renderCards();
 }
 
