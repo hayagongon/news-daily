@@ -295,7 +295,7 @@ body {
   aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text-body);
 }
-.cal-day.empty { color: var(--text-desc); }
+.cal-day.no-data { color: var(--text-desc); }
 .cal-day.has-articles {
   background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s;
   -webkit-tap-highlight-color: transparent;
@@ -709,7 +709,7 @@ body.select-mode .card-check { display: flex; }
 
 <!-- ===== 確認状況カレンダー ===== -->
 <div class="modal-backdrop" id="calendarBackdrop" onclick="closeCalendarOnBackdrop(event)">
-  <div class="modal-sheet" style="max-height:60vh">
+  <div class="modal-sheet">
     <div class="modal-header">
       <button class="cal-nav-btn" onclick="shiftCalendarMonth(-1)">‹</button>
       <div class="modal-title" id="calendarTitle" style="justify-content:center;color:var(--text-primary);font-size:15px"></div>
@@ -1641,13 +1641,15 @@ function renderCalendar() {
   const firstDay  = new Date(calYear, calMonth, 1).getDay();
   const lastDate  = new Date(calYear, calMonth + 1, 0).getDate();
 
+  // 6週分(42マス)で固定し、月をまたいでもカレンダーの大きさが変わらないようにする
+  const totalCells = 42;
   let cells = "";
-  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-day empty"></div>`;
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-day no-data"></div>`;
   for (let d = 1; d <= lastDate; d++) {
     const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const hasArticles = articleDates.has(dateStr);
     let cls = "cal-day";
-    if (!hasArticles) cls += " empty";
+    if (!hasArticles) cls += " no-data";
     else {
       cls += " has-articles";
       cls += reviewedDates.has(dateStr) ? " reviewed" : " pending";
@@ -1657,6 +1659,7 @@ function renderCalendar() {
     const onclick = hasArticles ? ` onclick="toggleReviewed('${dateStr}')"` : "";
     cells += `<div class="${cls}"${onclick}>${d}<span class="cal-day-mark">${mark}</span></div>`;
   }
+  for (let i = firstDay + lastDate; i < totalCells; i++) cells += `<div class="cal-day no-data"></div>`;
 
   document.getElementById("calendarGrid").innerHTML = cells;
 }
