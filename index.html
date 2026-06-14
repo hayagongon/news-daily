@@ -3,54 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>📰 ニュース</title>
+<title>📰 ニュースDB(2026年以降)</title>
 <style>
 /* ===== リセット ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ===== テーマ変数 ===== */
+/* ===== テーマ変数（夜藍 v2 / ダーク専用） ===== */
 :root {
-  --bg:              #f0f2f5;
-  --surface:         #ffffff;
-  --surface2:        #fafafa;
-  --border:          #e8e8e8;
-  --text-primary:    #111111;
-  --text-secondary:  #555555;
-  --text-muted:      #999999;
-  --hd-bg:           #ffffff;
-  --hd-shadow:       0 2px 8px rgba(0,0,0,0.08);
-  --card-shadow:     0 1px 4px rgba(0,0,0,0.07);
-  --card-hover:      0 4px 16px rgba(0,0,0,0.13);
-  --sel-bg:          #f0f7ff;
-  --sel-border:      #2980b9;
-  --sel-check-bg:    #dbeeff;
-  --chip-bg:         #efefef;
-  --chip-txt:        #555;
-  --chip-active-bg:  #1a1a1a;
+  --bg:              #06091a;
+  --surface:         #0d1830;
+  --surface-2:       #0a1022;
+  --surface-3:       #090d1c;
+  --border:          rgba(74,143,255,0.10);
+  --border-sub:      rgba(255,255,255,0.04);
+  --text-primary:    #e8eef8;
+  --text-body:       #bcc8dc;
+  --text-desc:       rgba(180,200,220,0.38);
+  --text-sub:        rgba(188,200,220,0.62);
+  --accent:          #4a8fff;
+  --danger:          #ff3b30;
+  --danger-deep:     #cc1100;
+
+  /* 互換マッピング（旧変数名 → 新トークン） */
+  --text-secondary:  var(--text-body);
+  --text-muted:      var(--text-sub);
+  --sel-bg:          rgba(74,143,255,0.08);
+  --sel-border:      var(--accent);
+  --sel-check-bg:    rgba(74,143,255,0.15);
+  --chip-bg:         rgba(255,255,255,0.04);
+  --chip-txt:        var(--text-sub);
+  --chip-active-bg:  var(--accent);
   --chip-active-txt: #ffffff;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:              #101010;
-    --surface:         #1e1e1e;
-    --surface2:        #252525;
-    --border:          #333333;
-    --text-primary:    #f0f0f0;
-    --text-secondary:  #aaaaaa;
-    --text-muted:      #666666;
-    --hd-bg:           #1a1a1a;
-    --hd-shadow:       0 2px 8px rgba(0,0,0,0.45);
-    --card-shadow:     0 1px 4px rgba(0,0,0,0.35);
-    --card-hover:      0 4px 16px rgba(0,0,0,0.55);
-    --sel-bg:          #1a2a3a;
-    --sel-border:      #4a9fd4;
-    --sel-check-bg:    #1c2d3d;
-    --chip-bg:         #2a2a2a;
-    --chip-txt:        #ccc;
-    --chip-active-bg:  #eeeeee;
-    --chip-active-txt: #111111;
-  }
-}
+
+@keyframes sheetUp { from { transform: translateY(100%); opacity: .4; } to { transform: translateY(0); opacity: 1; } }
+@keyframes dimIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideOut { to { opacity: 0; transform: translateX(-30px); max-height: 0; overflow: hidden; } }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
@@ -63,56 +51,87 @@ body {
 /* ===== ヘッダー ===== */
 .header {
   position: sticky; top: 0; z-index: 200;
-  background: var(--hd-bg);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--hd-shadow);
 }
 .header-top {
-  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+  max-width: 1280px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
-.header-title { font-size: 17px; font-weight: 700; flex: 1; white-space: nowrap; }
-.header-stats { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.header-title-group { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; }
+.header-title { font-size: 20px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
 
-/* ボタン共通 */
-.btn {
-  display: inline-flex; align-items: center;
-  border: none; border-radius: 8px;
-  font-size: 13.5px; font-weight: 600; cursor: pointer;
-  padding: 8px 13px; white-space: nowrap;
-  transition: all 0.15s; font-family: inherit; line-height: 1;
-}
-.btn-select {
-  background: transparent;
-  border: 1.5px solid var(--sel-border);
-  color: var(--sel-border);
-}
-.btn-select:hover { background: var(--sel-bg); }
-.btn-delete { background: #e74c3c; color: #fff; }
-.btn-delete:disabled { background: var(--chip-bg); color: var(--text-muted); cursor: not-allowed; }
-.btn-delete:not(:disabled):hover { background: #c0392b; transform: scale(1.02); }
-
-/* 設定ボタン */
-.btn-settings {
-  background: transparent; border: none;
-  color: var(--text-muted); font-size: 17px;
-  cursor: pointer; padding: 4px 6px; border-radius: 6px;
-  line-height: 1; transition: all 0.15s;
+/* ヘッダーアイコンボタン（🗑📌📅⚙） */
+.icon-btn {
+  position: relative;
+  background: transparent; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.28); font-size: 17px;
+  padding: 4px 6px; border-radius: 6px; line-height: 1;
+  transition: color 0.15s; font-family: inherit;
   -webkit-tap-highlight-color: transparent;
 }
-.btn-settings:hover { background: var(--chip-bg); color: var(--text-secondary); }
+.icon-btn:hover { color: var(--text-primary); }
 
-/* ===== フィルターバー ===== */
+.trash-badge {
+  position: absolute; top: 0; right: 0;
+  background: var(--danger); color: #fff; font-size: 10px; font-weight: 700;
+  min-width: 16px; height: 16px; line-height: 16px; text-align: center;
+  border-radius: 8px; padding: 0 3px;
+}
+.trash-badge.hidden { display: none; }
+
+/* 選択モードヘッダー */
+.select-cancel-btn {
+  display: none;
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  color: var(--accent); font-size: 13.5px; font-weight: 600; padding: 6px 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.select-status {
+  display: none;
+  flex: 1; text-align: center;
+  font-size: 14px; font-weight: 500; color: var(--text-primary);
+}
+.select-trash-btn {
+  display: none;
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  color: rgba(255,255,255,0.28); font-size: 22px; padding: 2px 4px; line-height: 1;
+  transition: color 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.select-trash-btn.active { color: var(--danger); }
+
+/* 選択モード切替（ヘッダー） */
+#headerEl.select-mode #titleGroup,
+#headerEl.select-mode #btnTrash,
+#headerEl.select-mode #btnPin,
+#headerEl.select-mode #btnCalendar,
+#headerEl.select-mode #btnGear,
+#headerEl.select-mode .filter-bar,
+#headerEl.select-mode #yearSelect,
+#headerEl.select-mode #monthSelect,
+#headerEl.select-mode #btnSearchToggle,
+#headerEl.select-mode #btnSelectToggle,
+#headerEl.select-mode #sortBtn { display: none; }
+
+#headerEl.select-mode #btnCancelSelect  { display: inline-flex; }
+#headerEl.select-mode #selectStatus     { display: block; }
+#headerEl.select-mode #btnTrashSelect   { display: inline-flex; }
+#headerEl.select-mode #selectCountText  { display: inline-flex; }
+
+/* ===== フィルターバー（カテゴリタブ） ===== */
 .filter-bar {
   display: flex; align-items: center; gap: 6px;
-  padding: 8px 14px; overflow-x: auto; scrollbar-width: none;
+  padding: 8px 14px 8px; padding-right: 8px;
+  overflow-x: auto; scrollbar-width: none;
+  max-width: 1280px; margin: 0 auto; width: 100%; box-sizing: border-box;
   border-top: 1px solid var(--border); -webkit-overflow-scrolling: touch;
 }
 .filter-bar::-webkit-scrollbar { display: none; }
 
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 12px; border-radius: 20px;
-  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 5px 8px 11px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
   white-space: nowrap; border: none;
   background: var(--chip-bg); color: var(--chip-txt);
   transition: all 0.15s; font-family: inherit; flex-shrink: 0;
@@ -120,60 +139,77 @@ body {
 }
 .chip.active { background: var(--chip-active-bg); color: var(--chip-active-txt); }
 .chip:hover:not(.active) { opacity: 0.75; }
-.chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-.filter-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
-
-.date-select {
-  padding: 5px 9px; border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-primary);
-  font-size: 12.5px; font-weight: 600; cursor: pointer;
-  font-family: inherit; flex-shrink: 0; outline: none;
-}
-.date-select:focus { border-color: var(--sel-border); }
-
-/* ===== 検索・並べ替えバー ===== */
+/* ===== フィルター行（年/月/検索/選択/ソート） ===== */
 .search-row {
   display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px 8px; border-top: 1px solid var(--border);
+  padding: 7px 14px 6px; border-top: 1px solid var(--border);
   flex-wrap: wrap;
+  max-width: 1280px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
 .search-select {
   padding: 5px 8px; border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-primary);
+  border: 1px solid rgba(74,143,255,0.14);
+  background: rgba(74,143,255,0.07); color: var(--text-primary);
   font-size: 12.5px; font-weight: 600; cursor: pointer;
   font-family: inherit; flex-shrink: 0; outline: none;
   min-width: 56px;
 }
-.search-select:focus { border-color: var(--sel-border); }
-.search-input {
-  flex: 1; min-width: 100px;
-  padding: 5px 10px; border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-primary);
-  font-size: 12.5px; font-family: inherit; outline: none;
+.search-select:focus { border-color: var(--accent); }
+
+/* 🔍検索 / ☐選択モード ボタン */
+.icon-square-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 28px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-primary); font-size: 14px; cursor: pointer;
+  font-family: inherit; flex-shrink: 0; transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.search-input:focus { border-color: var(--sel-border); }
-.search-input::placeholder { color: var(--text-muted); }
+.icon-square-btn:hover { border-color: rgba(255,255,255,0.16); }
+
 .sort-btn {
   padding: 5px 10px; border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-primary);
+  border: 1px solid rgba(74,143,255,0.14);
+  background: rgba(74,143,255,0.07); color: var(--text-primary);
   font-size: 12px; font-weight: 600; cursor: pointer;
   font-family: inherit; flex-shrink: 0; white-space: nowrap;
 }
-.sort-btn:hover { background: var(--chip-bg); }
-.reset-btn {
-  padding: 5px 8px; border-radius: 8px;
-  border: none; background: none; cursor: pointer;
-  font-size: 13px; color: var(--text-muted); font-family: inherit; flex-shrink: 0;
+.sort-btn:hover { background: rgba(74,143,255,0.14); }
+
+/* 検索モード（フィルター行） */
+.search-mode-icon {
+  display: none; font-size: 14px; color: rgba(255,255,255,0.4); flex-shrink: 0;
 }
-.reset-btn:hover { color: var(--text-primary); }
-.count-badge {
-  font-size: 11.5px; color: var(--text-muted);
-  flex-shrink: 0; white-space: nowrap; margin-left: auto;
+.search-input {
+  display: none;
+  flex: 1; min-width: 100px;
+  padding: 5px 4px; border: none; background: none;
+  color: var(--text-primary); font-size: 12.5px; font-family: inherit; outline: none;
+}
+.search-input::placeholder { color: var(--text-sub); }
+.search-close-btn {
+  display: none;
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  color: var(--text-sub); font-size: 13px; flex-shrink: 0; padding: 5px 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.search-close-btn:hover { color: var(--text-primary); }
+
+#headerEl.search-mode #yearSelect,
+#headerEl.search-mode #monthSelect,
+#headerEl.search-mode #btnSearchToggle,
+#headerEl.search-mode #btnSelectToggle,
+#headerEl.search-mode #sortBtn { display: none; }
+
+#headerEl.search-mode #searchModeIcon { display: inline-flex; }
+#headerEl.search-mode #searchInput    { display: block; }
+#headerEl.search-mode #btnSearchClose { display: inline-flex; }
+
+/* 選択モード（フィルター行） */
+.select-count-text {
+  display: none;
+  font-size: 12.5px; color: var(--text-sub); font-weight: 600;
 }
 
 /* ===== ローディング ===== */
@@ -197,7 +233,7 @@ body {
   padding: 60px 20px; color: var(--text-muted);
 }
 .error-icon { font-size: 36px; margin-bottom: 12px; }
-.error-msg { font-size: 13px; color: #e74c3c; margin: 8px 0; }
+.error-msg { font-size: 13px; color: var(--danger); margin: 8px 0; }
 .btn-retry {
   margin-top: 16px; background: var(--sel-border); color: #fff;
   border: none; border-radius: 8px; padding: 10px 24px;
@@ -205,7 +241,7 @@ body {
 }
 
 /* ===== メインコンテンツ ===== */
-.main { max-width: 1400px; margin: 0 auto; padding: 10px 12px 100px; }
+.main { max-width: 1280px; margin: 0 auto; padding: 2px 12px 24px; }
 
 /* ===== カードグリッド（レスポンシブ列） ===== */
 .cards-grid {
@@ -214,10 +250,10 @@ body {
   gap: 8px;
   margin-bottom: 4px;
 }
-@media (min-width: 760px) {
+@media (min-width: 769px) {
   .cards-grid { grid-template-columns: 1fr 1fr; }
 }
-@media (min-width: 1200px) {
+@media (min-width: 1100px) {
   .cards-grid { grid-template-columns: 1fr 1fr 1fr; }
 }
 
@@ -229,31 +265,70 @@ body {
 }
 .date-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
+/* ===== 確認状況カレンダー ===== */
+.cal-nav-btn {
+  background: var(--chip-bg); border: none; color: var(--text-muted);
+  font-size: 16px; font-weight: 700; width: 32px; height: 32px;
+  border-radius: 8px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+  flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+}
+.cal-nav-btn:hover { color: var(--text-primary); background: rgba(74,143,255,0.1); }
+.calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted);
+  padding: 4px 0 8px;
+}
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.cal-day {
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text-body);
+}
+.cal-day.no-data { color: var(--text-desc); }
+.cal-day.has-articles {
+  background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cal-day.has-articles:hover { background: rgba(74,143,255,0.1); }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-day-mark { font-size: 9px; line-height: 1; color: transparent; }
+.cal-day.pending .cal-day-mark { color: var(--danger); }
+.cal-day.reviewed .cal-day-mark { color: var(--accent); }
+.calendar-legend {
+  display: flex; gap: 18px; justify-content: center;
+  font-size: 11.5px; color: var(--text-sub); padding: 14px 0 6px;
+}
+.cal-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 3px;
+  margin-right: 5px; vertical-align: middle;
+}
+.cal-dot.reviewed { background: var(--accent); }
+.cal-dot.pending { background: var(--danger); }
+
 /* ===== カード ===== */
 .swipe-wrapper {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  box-shadow: var(--card-shadow);
-  transition: box-shadow 0.15s, transform 0.15s;
+  transition: max-height 0.25s ease, opacity 0.25s ease, margin-bottom 0.25s ease;
 }
-.swipe-wrapper:hover { box-shadow: var(--card-hover); transform: translateY(-1px); }
-.swipe-del-btn {
-  position: absolute;
-  top: 0; bottom: 0; width: 72px;
-  background: #e74c3c; color: #fff;
-  border: none; cursor: pointer;
-  font-size: 12px; font-weight: 700;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px;
-  user-select: none; -webkit-user-select: none;
+.swipe-wrapper.removing {
+  opacity: 0; max-height: 0 !important; margin-bottom: 0 !important; pointer-events: none;
+}
+.swipe-del-zone {
+  position: absolute; inset: 0; border-radius: 12px;
+  background: var(--danger); color: #fff;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-weight: 700;
   transition: background 0.15s;
 }
-.swipe-del-right { right: 0; }
-.swipe-del-left  { left: 0; }
-.swipe-del-btn.full-swipe { background: #c0392b; }
-.swipe-del-btn:active { background: #c0392b; }
-@media (min-width: 760px) { .swipe-del-btn { display: none; } }
+.swipe-del-label {
+  width: 100px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.swipe-del-label span:first-child { font-size: 18px; }
+@media (min-width: 769px) { .swipe-del-zone { display: none; } }
 
 .card {
   position: relative;
@@ -261,26 +336,29 @@ body {
   background: var(--surface); border-radius: 12px;
   display: flex; align-items: stretch; flex-direction: column;
   transition: border-color 0.1s, background 0.1s;
-  overflow: hidden; cursor: pointer; border: 2px solid transparent;
+  overflow: hidden; cursor: pointer; border: 1px solid var(--border-sub);
   -webkit-tap-highlight-color: transparent;
 }
 .card:active { transform: scale(0.99); }
-.card.selected { border-color: var(--sel-border); background: var(--sel-bg); }
+.card.selected { border-color: var(--accent); background: linear-gradient(var(--sel-bg), var(--sel-bg)), var(--surface); }
 
 .card-check {
-  display: flex; align-items: center; justify-content: center;
-  padding: 0 13px; background: var(--surface2);
-  border-right: 1px solid var(--border); flex-shrink: 0;
+  display: flex;
+  align-items: center; justify-content: center;
+  padding: 0 5px; background: var(--surface-2);
+  border-right: 1px solid var(--border-sub); flex-shrink: 0;
+  visibility: hidden;
 }
+body.select-mode .card-check { visibility: visible; }
 .card.selected .card-check { background: var(--sel-check-bg); }
 
 .checkbox {
-  width: 22px; height: 22px; border-radius: 6px;
-  border: 2px solid var(--border); background: var(--surface);
+  width: 14px; height: 14px; border-radius: 4px;
+  border: 1.5px solid var(--border-sub); background: var(--surface);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: all 0.12s;
 }
-.card.selected .checkbox { background: var(--sel-border); border-color: var(--sel-border); }
+.card.selected .checkbox { background: var(--accent); border-color: var(--accent); }
 .checkbox-icon { display: none; }
 .card.selected .checkbox-icon { display: block; }
 
@@ -293,19 +371,20 @@ body {
   margin-bottom: 6px; flex-wrap: wrap;
 }
 .cat-badge {
-  font-size: 11px; font-weight: 700; padding: 2px 9px;
+  font-size: 9.5px; font-weight: 700; padding: 2px 9px;
   border-radius: 20px; white-space: nowrap; letter-spacing: 0.02em;
 }
 .date-badge {
-  font-size: 11px; color: var(--text-muted); font-weight: 600;
+  font-size: 10px; color: var(--text-sub); font-weight: 600;
   background: var(--chip-bg); padding: 2px 7px; border-radius: 10px; white-space: nowrap;
 }
-.source-name { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-left: auto; }
-.card-title { font-size: 14.5px; font-weight: 700; line-height: 1.55; margin-bottom: 5px; color: var(--text-primary); }
-.card-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 7px; }
-.card-actions { display: flex; align-items: center; gap: 6px; }
-.card-url   { font-size: 11px; color: #2980b9; text-decoration: none; opacity: 0.75; word-break: break-all; flex: 1; min-width: 0; }
-.card-url:hover { opacity: 1; text-decoration: underline; }
+.card-title {
+  font-size: 13.5px; font-weight: 700; line-height: 1.55; margin-bottom: 5px; color: var(--text-body);
+}
+.card-desc {
+  font-size: 11.5px; color: var(--text-desc); line-height: 1.6;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .wayback-btn {
   flex-shrink: 0; border: none; background: none; cursor: pointer;
   font-size: 13px; padding: 2px 4px; border-radius: 4px; line-height: 1;
@@ -318,24 +397,6 @@ body {
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; display: none; }
 .empty-icon { font-size: 36px; display: block; margin-bottom: 10px; }
 
-/* ===== ゴミ箱フローティングボタン ===== */
-.trash-fab {
-  position: fixed; bottom: 28px; right: 20px; z-index: 300;
-  display: none; align-items: center; gap: 6px;
-  background: var(--surface); border: 1.5px solid var(--border);
-  color: var(--text-muted); font-size: 13px; font-weight: 600;
-  padding: 9px 14px; border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  cursor: pointer; font-family: inherit; transition: all 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.trash-fab:hover { color: var(--text-secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.2); transform: translateY(-1px); }
-.trash-fab.visible { display: flex; }
-.trash-fab-count {
-  background: #e74c3c; color: #fff; font-size: 11px; font-weight: 700;
-  padding: 2px 7px; border-radius: 10px; min-width: 22px; text-align: center;
-}
-
 /* ===== モーダル共通 ===== */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
@@ -345,7 +406,7 @@ body {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-sheet {
-  background: var(--surface); border-radius: 20px 20px 0 0;
+  background: var(--surface-2); border-radius: 20px 20px 0 0;
   width: 100%; max-width: 760px; max-height: 70vh;
   display: flex; flex-direction: column;
   animation: slideUp 0.25s cubic-bezier(0.34, 1.2, 0.64, 1); overflow: hidden;
@@ -353,10 +414,10 @@ body {
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 .modal-header {
-  display: flex; align-items: center; padding: 16px 18px 14px;
+  display: flex; align-items: center; gap: 8px; padding: 16px 18px 14px;
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.modal-title { flex: 1; font-size: 15px; font-weight: 700; color: var(--text-muted); }
+.modal-title { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; color: var(--text-muted); }
 .modal-close {
   background: var(--chip-bg); border: none; color: var(--text-muted);
   font-size: 14px; font-weight: 600; padding: 6px 14px;
@@ -366,10 +427,33 @@ body {
 
 .modal-body { overflow-y: auto; padding: 12px 14px 28px; -webkit-overflow-scrolling: touch; }
 
+/* ===== 記事詳細シート ===== */
+.detail-sheet { background: var(--surface); }
+.detail-title {
+  font-size: 17px; font-weight: 700; color: var(--text-primary);
+  line-height: 1.5; margin-bottom: 10px;
+}
+.detail-desc {
+  font-size: 13px; color: var(--text-body); line-height: 1.9;
+  margin-bottom: 24px; white-space: pre-wrap;
+}
+.detail-actions { display: flex; gap: 8px; }
+.detail-open-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; text-decoration: none;
+  border-radius: 10px; padding: 13px 0; font-size: 14.5px; font-weight: 700;
+  font-family: inherit;
+}
+.detail-actions .wayback-btn {
+  flex-shrink: 0; width: 46px; font-size: 18px; opacity: 1;
+  border: 1.5px solid var(--border); border-radius: 10px;
+}
+.detail-actions .wayback-btn:hover { background: var(--chip-bg); }
+
 /* ゴミ箱カード */
 .trash-card {
   display: flex; align-items: center; gap: 10px;
-  background: var(--surface2); border-radius: 10px;
+  background: var(--surface); border-radius: 10px;
   padding: 10px 12px 10px 10px; margin-bottom: 8px;
   border-left: 3px solid var(--border); opacity: 0.95;
 }
@@ -377,15 +461,15 @@ body {
 .trash-meta  { font-size: 10.5px; font-weight: 700; margin-bottom: 3px; }
 .trash-title { font-size: 13px; color: var(--text-secondary); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn-restore {
-  background: transparent; border: 1.5px solid var(--border); color: var(--text-muted);
+  background: transparent; border: 1.5px solid var(--accent); color: var(--accent);
   font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px;
   cursor: pointer; white-space: nowrap; font-family: inherit; flex-shrink: 0; transition: all 0.15s;
 }
-.btn-restore:hover { border-color: var(--sel-border); color: var(--sel-border); }
+.btn-restore:hover { background: var(--accent); color: #fff; }
 
 /* ===== 設定モーダル（設定シート） ===== */
 .settings-sheet {
-  background: var(--surface); border-radius: 20px 20px 0 0;
+  background: var(--surface-3); border-radius: 20px 20px 0 0;
   width: 100%; max-width: 760px; max-height: 90vh;
   display: flex; flex-direction: column;
   animation: slideUp 0.25s cubic-bezier(0.34, 1.2, 0.64, 1); overflow: hidden;
@@ -407,7 +491,7 @@ body {
 .pat-input {
   width: 100%; padding: 10px 12px;
   border: 1.5px solid var(--border); border-radius: 8px;
-  background: var(--surface2); color: var(--text-primary);
+  background: var(--surface); color: var(--text-primary);
   font-size: 13px; font-family: monospace; outline: none;
   transition: border-color 0.15s;
 }
@@ -417,13 +501,8 @@ body {
   font-size: 12px; margin-top: 6px;
   padding: 6px 10px; border-radius: 6px;
 }
-.pat-status.ok  { background: #e8f8f0; color: #27ae60; }
-.pat-status.ng  { background: #fef9e7; color: #95700a; }
-
-@media (prefers-color-scheme: dark) {
-  .pat-status.ok { background: #1a3a2a; color: #58d68d; }
-  .pat-status.ng { background: #2a2a1a; color: #f0c040; }
-}
+.pat-status.ok  { background: #1a3a2a; color: #58d68d; }
+.pat-status.ng  { background: #2a2a1a; color: #f0c040; }
 
 .settings-btns { display: flex; gap: 8px; margin-top: 12px; }
 .btn-save-pat {
@@ -431,13 +510,13 @@ body {
   border: none; border-radius: 8px; padding: 10px 0;
   font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
-.btn-save-pat:hover { background: #2471a3; }
+.btn-save-pat:hover { background: #3a7adb; }
 .btn-clear-pat {
   background: transparent; border: 1.5px solid var(--border); color: var(--text-muted);
   border-radius: 8px; padding: 10px 16px;
   font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
-.btn-clear-pat:hover { border-color: #e74c3c; color: #e74c3c; }
+.btn-clear-pat:hover { border-color: var(--danger); color: var(--danger); }
 
 .sync-info {
   font-size: 12px; color: var(--text-muted);
@@ -452,7 +531,7 @@ body {
 .kw-textarea {
   width: 100%; padding: 10px 12px;
   border: 1.5px solid var(--border); border-radius: 8px;
-  background: var(--surface2); color: var(--text-primary);
+  background: var(--surface); color: var(--text-primary);
   font-size: 13px; font-family: inherit; outline: none;
   resize: vertical; min-height: 100px; line-height: 1.7;
   transition: border-color 0.15s;
@@ -483,7 +562,7 @@ body {
 .toast {
   position: fixed; bottom: 28px; left: 50%;
   transform: translateX(-50%) translateY(90px);
-  background: #2c3e50; color: #fff;
+  background: var(--surface-3); border: 1px solid var(--border); color: #fff;
   padding: 10px 22px; border-radius: 24px;
   font-size: 14px; font-weight: 500;
   box-shadow: 0 6px 24px rgba(0,0,0,0.3);
@@ -497,11 +576,10 @@ body {
   .header-top  { padding: 9px 12px; gap: 7px; }
   .header-title { font-size: 16px; }
   .btn         { padding: 7px 11px; font-size: 13px; }
-  .main        { padding: 10px 8px 100px; }
+  .main        { padding: 2px 8px 24px; }
   .cards-grid  { grid-template-columns: 1fr !important; }
   .card-body   { padding: 10px 11px; }
   .card-title  { font-size: 14px; }
-  .trash-fab   { bottom: 20px; right: 14px; }
   .modal-sheet { max-height: 80vh; }
 }
 </style>
@@ -510,24 +588,27 @@ body {
 
 <!-- ===== ヘッダー ===== -->
 <div class="header" id="headerEl">
-  <div class="header-top">
-    <div class="header-title">📰 ニュース</div>
-    <button class="btn-settings" title="更新" onclick="location.reload()">🔄</button>
-    <button class="btn-settings" title="欲しかった記事を登録" onclick="openFeedback()">📌</button>
-    <button class="btn-settings" title="設定" onclick="openSettings()">⚙</button>
-    <span class="header-stats" id="stats"></span>
-    <button class="btn btn-select" id="btnSelectAll" onclick="toggleSelectAll()">全選択</button>
-    <button class="btn btn-delete" id="btnDelete" onclick="deleteSelected()" disabled>削除</button>
+  <div class="header-top" id="headerTop">
+    <div class="header-title-group" id="titleGroup">
+      <span class="header-title">ニュースDB(2026年以降)</span>
+    </div>
+    <button class="icon-btn" id="btnTrash" title="削除済み" onclick="openTrash()">🗑<span class="trash-badge" id="trashCount">0</span></button>
+    <button class="icon-btn" id="btnPin" title="欲しかった記事を登録" onclick="openFeedback()">📌</button>
+    <button class="icon-btn" id="btnCalendar" title="確認状況" onclick="openCalendar()">📅</button>
+    <button class="icon-btn" id="btnGear" title="設定" onclick="openSettings()">⚙</button>
+    <button class="select-cancel-btn" id="btnCancelSelect" onclick="exitSelectMode()">キャンセル</button>
+    <div class="select-status" id="selectStatus">選択してください</div>
+    <button class="select-trash-btn" id="btnTrashSelect" onclick="deleteSelected()" disabled>🗑</button>
   </div>
   <div class="filter-bar" id="filterBar">
     <button class="chip active" data-cat="全て"                    onclick="setCategory('全て')">全て</button>
-    <button class="chip" data-cat="政治"                           onclick="setCategory('政治')"><span class="chip-dot" style="background:#8e44ad"></span>政治</button>
-    <button class="chip" data-cat="経済"                           onclick="setCategory('経済')"><span class="chip-dot" style="background:#2980b9"></span>経済</button>
-    <button class="chip" data-cat="社会"                           onclick="setCategory('社会')"><span class="chip-dot" style="background:#7f8c8d"></span>社会</button>
-    <button class="chip" data-cat="国際"                           onclick="setCategory('国際')"><span class="chip-dot" style="background:#d35400"></span>国際</button>
-    <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')"><span class="chip-dot" style="background:#16a085"></span>スポーツ</button>
-    <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')"><span class="chip-dot" style="background:#e91e8c"></span>芸能・エンタメ・ゴシップ</button>
-    <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')"><span class="chip-dot" style="background:#2c3e50"></span>テクノロジー</button>
+    <button class="chip" data-cat="政治"                           onclick="setCategory('政治')">政治</button>
+    <button class="chip" data-cat="経済"                           onclick="setCategory('経済')">経済</button>
+    <button class="chip" data-cat="社会"                           onclick="setCategory('社会')">社会</button>
+    <button class="chip" data-cat="国際"                           onclick="setCategory('国際')">国際</button>
+    <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')">スポーツ</button>
+    <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')">芸能</button>
+    <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')">テック</button>
   </div>
   <div class="search-row" id="searchRow">
     <select class="search-select" id="yearSelect" onchange="setYear(this.value)">
@@ -536,11 +617,16 @@ body {
     <select class="search-select" id="monthSelect" onchange="setMonth(this.value)">
       <option value="全て">月</option>
     </select>
-    <input class="search-input" id="searchInput" type="text" placeholder="キーワード検索…"
-           oninput="setSearch(this.value)">
+    <button class="icon-square-btn" id="btnSearchToggle" title="検索" onclick="enterSearchMode()">🔍</button>
+    <button class="icon-square-btn" id="btnSelectToggle" title="選択" onclick="enterSelectMode()">☐</button>
     <button class="sort-btn" id="sortBtn" onclick="toggleSort()">↓ 新しい順</button>
-    <button class="reset-btn" id="resetBtn" onclick="resetFilters()" title="リセット">✕</button>
-    <span class="count-badge" id="countBadge"></span>
+
+    <span class="search-mode-icon" id="searchModeIcon">🔍</span>
+    <input class="search-input" id="searchInput" type="text" placeholder="タイトルで検索…"
+           oninput="setSearch(this.value)">
+    <button class="search-close-btn" id="btnSearchClose" onclick="exitSearchMode()">✕ 閉じる</button>
+
+    <span class="select-count-text" id="selectCountText">全0件</span>
   </div>
 </div>
 
@@ -567,10 +653,45 @@ body {
   </div>
 </div>
 
-<!-- ===== ゴミ箱フローティングボタン ===== -->
-<button class="trash-fab" id="trashFab" onclick="openTrash()">
-  🗑 削除済み <span class="trash-fab-count" id="trashCount">0</span>
-</button>
+<!-- ===== 記事詳細シート ===== -->
+<div class="modal-backdrop" id="detailBackdrop" onclick="closeDetailOnBackdrop(event)">
+  <div class="modal-sheet detail-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="detailMeta"></div>
+      <button class="modal-close" onclick="closeDetail()">閉じる</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-title" id="detailTitle"></div>
+      <div class="detail-desc" id="detailDesc"></div>
+      <div class="detail-actions">
+        <a class="detail-open-btn" id="detailOpenBtn" target="_blank" rel="noopener">原文を開く</a>
+        <button class="wayback-btn" id="detailWaybackBtn" title="Webアーカイブで開く">📦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 確認状況カレンダー ===== -->
+<div class="modal-backdrop" id="calendarBackdrop" onclick="closeCalendarOnBackdrop(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <button class="cal-nav-btn" onclick="shiftCalendarMonth(-1)">‹</button>
+      <div class="modal-title" id="calendarTitle" style="justify-content:center;color:var(--text-primary);font-size:15px"></div>
+      <button class="cal-nav-btn" onclick="shiftCalendarMonth(1)">›</button>
+      <button class="modal-close" onclick="closeCalendar()">閉じる</button>
+    </div>
+    <div class="modal-body">
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="calendar-legend">
+        <span><span class="cal-dot reviewed"></span>確認済み</span>
+        <span><span class="cal-dot pending"></span>未確認</span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== フィードバックモーダル ===== -->
 <div class="modal-backdrop" id="feedbackBackdrop" onclick="closeFeedbackOnBackdrop(event)">
@@ -596,6 +717,7 @@ body {
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title" id="trashModalTitle">削除済み（0件）</div>
+      <button class="sort-btn" id="trashSortBtn" onclick="toggleTrashSort()">削除した日付順</button>
       <button class="modal-close" onclick="closeTrash()">閉じる</button>
     </div>
     <div class="modal-body" id="trashList"></div>
@@ -671,13 +793,13 @@ const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
 
 // カテゴリ色
 const CAT_COLOR = {
-  "政治":                   "#8e44ad",
-  "経済":                   "#2980b9",
-  "社会":                   "#7f8c8d",
-  "国際":                   "#d35400",
-  "スポーツ":               "#16a085",
-  "芸能・エンタメ・ゴシップ": "#e91e8c",
-  "テクノロジー":            "#2c3e50",
+  "政治":                   "#ff6655",
+  "経済":                   "#5b9fff",
+  "社会":                   "#3dcc88",
+  "国際":                   "#b077ff",
+  "スポーツ":               "#ff9944",
+  "芸能・エンタメ・ゴシップ": "#ff70a6",
+  "テクノロジー":            "#11ddcc",
 };
 const CAT_SHORT = { "芸能・エンタメ・ゴシップ": "エンタメ" };
 
@@ -693,6 +815,13 @@ let activeMonth     = "全て";
 let searchQuery     = "";
 let sortOrder       = "desc";  // "desc"=新しい順 "asc"=古い順
 let excludeKeywords = [];   // 除外キーワードリスト
+let selectMode      = false;
+let searchMode      = false;
+let detailArticleId = null;
+let trashSortMode   = "deleted"; // "deleted"=削除した日付順 "article"=記事の日付順
+let reviewedDates   = new Set(); // 確認済みにした日付（YYYY-MM-DD）
+let calYear, calMonth; // カレンダーモーダルで表示中の年月（0始まり月）
+let cardsNeedRefresh = false; // ゴミ箱モーダルを閉じる際に renderCards() が必要か
 
 // ===== AI 除外ID 読み込み =====
 async function loadAiExcluded() {
@@ -888,6 +1017,20 @@ async function saveFeedback() {
   }
 }
 
+// ===== フィルター状態の保存・復元（前回表示したフィルタを引き継ぐ） =====
+function loadFilterState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("filterState") || "{}");
+    if (typeof saved.activeCat   === "string") activeCat   = saved.activeCat;
+    if (typeof saved.activeYear  === "string") activeYear  = saved.activeYear;
+    if (typeof saved.activeMonth === "string") activeMonth = saved.activeMonth;
+    if (saved.sortOrder === "asc" || saved.sortOrder === "desc") sortOrder = saved.sortOrder;
+  } catch {}
+}
+function saveFilterState() {
+  localStorage.setItem("filterState", JSON.stringify({ activeCat, activeYear, activeMonth, sortOrder }));
+}
+
 // ===== 削除済みID の保存 =====
 function loadLocalDeleted() {
   try { return JSON.parse(localStorage.getItem("deletedIds") || "[]"); }
@@ -924,6 +1067,53 @@ async function syncDeleted() {
   }
 }
 
+// ===== 確認済み日付の保存 =====
+function loadLocalReviewed() {
+  try { return JSON.parse(localStorage.getItem("reviewedDates") || "[]"); }
+  catch { return []; }
+}
+function saveLocalReviewed(dates) {
+  localStorage.setItem("reviewedDates", JSON.stringify([...dates]));
+}
+
+async function loadRemoteReviewed() {
+  try {
+    const { ok, data } = await ghContents("review-progress.json");
+    if (!ok || !data || !data.content) return { dates: [], until: null, sha: null };
+    const obj = JSON.parse(atob(data.content.replace(/\n/g, "")));
+    return {
+      dates: Array.isArray(obj.reviewedDates) ? obj.reviewedDates : [],
+      until: typeof obj.reviewedUntil === "string" ? obj.reviewedUntil : null,
+      sha: data.sha,
+    };
+  } catch {
+    return { dates: [], until: null, sha: null };
+  }
+}
+
+async function syncReviewed() {
+  if (!PAT.get()) return;
+  try {
+    const { sha } = await loadRemoteReviewed();
+    await ghPut(
+      "review-progress.json",
+      JSON.stringify({ reviewedDates: [...reviewedDates] }, null, 2),
+      sha,
+      `✅ 確認状況の更新 (${reviewedDates.size}日)`
+    );
+  } catch (e) {
+    console.warn("GitHub同期に失敗:", e.message);
+  }
+}
+
+function toggleReviewed(date) {
+  if (reviewedDates.has(date)) reviewedDates.delete(date);
+  else reviewedDates.add(date);
+  saveLocalReviewed(reviewedDates);
+  syncReviewed();
+  renderCalendar();
+}
+
 // ===== 記事の読み込み =====
 async function fetchArticles() {
   // GitHub Pages 経由でキャッシュを回避して取得
@@ -938,11 +1128,15 @@ async function init() {
   document.getElementById("errorState").style.display   = "none";
   document.getElementById("mainContent").style.display  = "none";
 
+  loadFilterState();
+  updateSortBtnLabel();
+
   try {
-    const [articles, remote, aiExcluded] = await Promise.all([
+    const [articles, remote, aiExcluded, remoteReviewed] = await Promise.all([
       fetchArticles(),
       loadRemoteDeleted(),
       loadAiExcluded(),
+      loadRemoteReviewed(),
     ]);
 
     allArticles   = Array.isArray(articles) ? articles : [];
@@ -952,6 +1146,26 @@ async function init() {
     const local = loadLocalDeleted();
     deletedIds  = new Set([...local, ...remote.ids]);
     saveLocalDeleted(deletedIds);
+
+    // ローカル + リモートの確認済み日付をマージ
+    const localReviewed = loadLocalReviewed();
+    reviewedDates = new Set([...localReviewed, ...remoteReviewed.dates]);
+
+    // 旧バージョン（確認済みライン方式）からの移行
+    const oldUntil = localStorage.getItem("reviewedUntil");
+    let migrated = false;
+    if (oldUntil) {
+      allArticles.forEach(a => { if (a.date <= oldUntil) reviewedDates.add(a.date); });
+      localStorage.removeItem("reviewedUntil");
+      migrated = true;
+    }
+    if (remoteReviewed.until) {
+      allArticles.forEach(a => { if (a.date <= remoteReviewed.until) reviewedDates.add(a.date); });
+      migrated = true;
+    }
+
+    saveLocalReviewed(reviewedDates);
+    if (migrated) syncReviewed();
 
   } catch (e) {
     document.getElementById("loadingState").style.display = "none";
@@ -991,70 +1205,115 @@ function getFiltered() {
   });
 }
 function getDeleted() {
+  const list = allArticles.filter(a => deletedIds.has(a.id));
+  if (trashSortMode === "article") {
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }
   const orderMap = new Map([...deletedIds].map((id, i) => [id, i]));
-  return allArticles
-    .filter(a => deletedIds.has(a.id))
-    .sort((a, b) => orderMap.get(b.id) - orderMap.get(a.id));
+  return list.sort((a, b) => orderMap.get(b.id) - orderMap.get(a.id));
 }
 
-function setCategory(cat) { activeCat = cat; selectedIds.clear(); render(); }
-function setYear(val)  { activeYear  = val; activeMonth = "全て"; selectedIds.clear(); render(); }
-function setMonth(val) { activeMonth = val; selectedIds.clear(); render(); }
+function setCategory(cat) { activeCat = cat; selectedIds.clear(); saveFilterState(); render(); }
+function setYear(val)  { activeYear  = val; activeMonth = "全て"; selectedIds.clear(); saveFilterState(); render(); }
+function setMonth(val) { activeMonth = val; selectedIds.clear(); saveFilterState(); render(); }
 function setSearch(val){ searchQuery = val.trim(); render(); }
-function toggleSort() {
-  sortOrder = sortOrder === "desc" ? "asc" : "desc";
+function updateSortBtnLabel() {
   document.getElementById("sortBtn").textContent =
     sortOrder === "desc" ? "↓ 新しい順" : "↑ 古い順";
+}
+function toggleSort() {
+  sortOrder = sortOrder === "desc" ? "asc" : "desc";
+  updateSortBtnLabel();
+  saveFilterState();
   renderCards();
 }
-function resetFilters() {
-  activeYear  = "全て";
-  activeMonth = "全て";
+
+// ===== 検索モード =====
+function enterSearchMode() {
+  searchMode = true;
+  document.getElementById("headerEl").classList.add("search-mode");
+  setTimeout(() => document.getElementById("searchInput").focus(), 50);
+}
+function exitSearchMode() {
+  searchMode  = false;
   searchQuery = "";
-  sortOrder   = "desc";
-  document.getElementById("searchInput").value  = "";
-  document.getElementById("sortBtn").textContent = "↓ 新しい順";
-  selectedIds.clear();
+  document.getElementById("searchInput").value = "";
+  document.getElementById("headerEl").classList.remove("search-mode");
   render();
 }
 
-// ===== 選択 =====
-function toggleSelect(id, e) {
+// ===== 選択モード =====
+function enterSelectMode() {
+  selectMode = true;
+  document.body.classList.add("select-mode");
+  document.getElementById("headerEl").classList.add("select-mode");
+  updateHeader();
+}
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.forEach(id => {
+    const card = document.getElementById("card-" + id);
+    if (card) card.classList.remove("selected");
+  });
+  selectedIds.clear();
+  document.body.classList.remove("select-mode");
+  document.getElementById("headerEl").classList.remove("select-mode");
+  updateHeader();
+}
+
+// ===== カードタップ =====
+function onCardTap(id, e) {
   if (_swipeJustClosed) { _swipeJustClosed = false; return; }
-  if (e && e.target.closest("a, button")) return;
-  const card = document.getElementById("card-" + id);
-  const wrapper = card?.closest(".swipe-wrapper");
-  if (wrapper?.classList.contains("swiped")) {
-    wrapper.classList.remove("swiped");
-    card.style.transition = "transform 0.2s ease";
-    card.style.transform = "translateX(0)";
-    return;
+  if (selectMode) {
+    if (e && e.target.closest("a, button")) return;
+    selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
+    const card = document.getElementById("card-" + id);
+    if (card) card.classList.toggle("selected", selectedIds.has(id));
+    updateHeader();
+  } else {
+    openDetail(id);
   }
-  selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
-  if (card) card.classList.toggle("selected", selectedIds.has(id));
-  updateHeader();
 }
-function toggleSelectAll() {
-  const visible    = getFiltered().map(a => a.id);
-  const allChecked = visible.length > 0 && visible.every(id => selectedIds.has(id));
-  if (allChecked) visible.forEach(id => selectedIds.delete(id));
-  else            visible.forEach(id => selectedIds.add(id));
-  renderCards();
-  updateHeader();
+
+// ===== 記事詳細シート =====
+function openDetail(id) {
+  const a = allArticles.find(x => x.id === id);
+  if (!a) return;
+  detailArticleId = id;
+  const col = catColor(a.cat);
+  document.getElementById("detailMeta").innerHTML =
+    `<span class="cat-badge" style="background:${col}22;color:${col}">${catShort(a.cat)}</span>` +
+    `<span class="date-badge">${toShortDate(a.date)}</span>`;
+  document.getElementById("detailTitle").textContent = a.title;
+  document.getElementById("detailDesc").textContent   = a.desc || "";
+  document.getElementById("detailOpenBtn").href = a.url;
+  document.getElementById("detailWaybackBtn").onclick = e => openWayback(a.url, e);
+  document.getElementById("detailBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
 }
+function closeDetail() {
+  document.getElementById("detailBackdrop").classList.remove("open");
+  document.body.style.overflow = "";
+  detailArticleId = null;
+}
+function closeDetailOnBackdrop(e) { if (e.target === document.getElementById("detailBackdrop")) closeDetail(); }
 
 // ===== 削除 =====
 async function deleteSelected() {
   const count = selectedIds.size;
   if (!count) return;
   // メタデータを先に収集（selectedIds.clear() 前に）
+  const ids  = [...selectedIds];
   const meta = allArticles
     .filter(a => selectedIds.has(a.id))
     .map(a => ({ title: a.title, cat: a.cat, src: a.src, date: todayStr() }));
   selectedIds.forEach(id => deletedIds.add(id));
   selectedIds.clear();
   saveLocalDeleted(deletedIds);
-  render();
+  removeCardElements(ids);
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   showToast(`${count}件を削除しました`);
   await syncDeleted();
   syncDeletedLog(meta);  // fire-and-forget（UIをブロックしない）
@@ -1068,95 +1327,90 @@ async function doDelete(id) {
   selectedIds.delete(id);
   deletedIds.add(id);
   saveLocalDeleted(deletedIds);
-  render();
+  removeCardElements([id]);
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   showToast("1件を削除しました");
   await syncDeleted();
   syncDeletedLog(meta);
 }
-async function swipeDeleteCard(id, e) {
-  e.stopPropagation();
-  await doDelete(id);
-}
 
+// ===== カード要素を直接削除（全件再描画を避ける軽量更新） =====
+function removeCardElements(ids) {
+  const list = document.getElementById("newsList");
+  const affectedGrids = new Set();
+  let removedAny = false;
+  ids.forEach(id => {
+    const card = document.getElementById("card-" + id);
+    const wrapper = card && card.closest(".swipe-wrapper");
+    if (!wrapper) return;
+    const grid = wrapper.parentElement;
+    if (grid) affectedGrids.add(grid);
+    wrapper.remove();
+    removedAny = true;
+  });
+  if (!removedAny) return;
+  // 空になった日付グループ（見出し＋カードグリッド）を削除
+  affectedGrids.forEach(grid => {
+    if (grid.children.length === 0) {
+      const header = grid.previousElementSibling;
+      if (header && header.classList.contains("date-header")) header.remove();
+      grid.remove();
+    }
+  });
+  // 表示中の記事が0件になった場合は通常の再描画で空状態を表示
+  if (list.children.length === 0) renderCards();
+}
 function initSwipe() {
   if (!("ontouchstart" in window)) return;
-  const SNAP = 72, THRESHOLD = 40, FULL = 120;
-  let openWrapper = null;
-
-  function closeOpen() {
-    if (!openWrapper) return;
-    const c = openWrapper.querySelector(".card");
-    c.style.transition = "transform 0.2s ease";
-    c.style.transform = "translateX(0)";
-    openWrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.remove("full-swipe"));
-    openWrapper.classList.remove("swiped");
-    openWrapper = null;
-  }
+  const THRESHOLD = 76, MAX = THRESHOLD + 24;
 
   document.querySelectorAll(".swipe-wrapper").forEach(wrapper => {
     const card = wrapper.querySelector(".card");
-    const id = card.id.slice(5); // "card-" を除いた記事ID
-    let startX = 0, startY = 0, dx = 0, rawMoveX = 0, direction = null;
+    const zone = wrapper.querySelector(".swipe-del-zone");
+    const id   = wrapper.dataset.id;
+    let startX = 0, startY = 0, dx = 0, direction = null;
 
     wrapper.addEventListener("touchstart", e => {
-      if (openWrapper && openWrapper !== wrapper) closeOpen();
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      dx = 0; rawMoveX = 0; direction = null;
+      dx = 0; direction = null;
       card.style.transition = "none";
     }, { passive: true });
 
     wrapper.addEventListener("touchmove", e => {
       const curX = e.touches[0].clientX;
       const curY = e.touches[0].clientY;
-      rawMoveX = curX - startX;
-      const moveY = curY - startY;
+      const rawX = curX - startX;
+      const rawY = curY - startY;
 
-      if (direction === null && (Math.abs(rawMoveX) > 8 || Math.abs(moveY) > 8)) {
-        direction = Math.abs(rawMoveX) > Math.abs(moveY) ? "h" : "v";
+      if (direction === null && (Math.abs(rawX) > 7 || Math.abs(rawY) > 7)) {
+        direction = Math.abs(rawX) > Math.abs(rawY) ? "h" : "v";
       }
       if (direction !== "h") return;
 
-      dx = Math.max(-SNAP, Math.min(SNAP, rawMoveX));
+      dx = Math.max(-MAX, Math.min(MAX, rawX));
       card.style.transform = `translateX(${dx}px)`;
-
-      // フルスワイプ視覚フィードバック
-      const isFull = Math.abs(rawMoveX) >= FULL;
-      wrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.toggle("full-swipe", isFull));
+      zone.style.background = Math.abs(dx) > THRESHOLD ? "var(--danger-deep)" : "var(--danger)";
     }, { passive: true });
 
     wrapper.addEventListener("touchend", () => {
       if (direction !== "h") return;
-      wrapper.querySelectorAll(".swipe-del-btn").forEach(b => b.classList.remove("full-swipe"));
 
-      // フルスワイプ → 即削除
-      if (Math.abs(rawMoveX) >= FULL) {
-        card.style.transition = "transform 0.15s ease-in";
-        card.style.transform = `translateX(${rawMoveX > 0 ? "120%" : "-120%"})`;
-        if (openWrapper === wrapper) openWrapper = null;
-        wrapper.classList.remove("swiped");
-        setTimeout(() => doDelete(id), 150);
-        return;
-      }
-
-      card.style.transition = "transform 0.2s ease";
-      if (dx < -THRESHOLD) {
-        card.style.transform = `translateX(-${SNAP}px)`;
-        wrapper.classList.add("swiped");
-        openWrapper = wrapper;
-      } else if (dx > THRESHOLD) {
-        card.style.transform = `translateX(${SNAP}px)`;
-        wrapper.classList.add("swiped");
-        openWrapper = wrapper;
+      if (Math.abs(dx) > THRESHOLD) {
+        card.style.transition = "transform 0.2s ease-in";
+        card.style.transform = `translateX(${dx > 0 ? "120%" : "-120%"})`;
+        wrapper.style.maxHeight = wrapper.offsetHeight + "px";
+        requestAnimationFrame(() => wrapper.classList.add("removing"));
+        setTimeout(() => doDelete(id), 220);
       } else {
-        if (wrapper.classList.contains("swiped")) {
-          _swipeJustClosed = true;
-          setTimeout(() => _swipeJustClosed = false, 500);
-        }
+        card.style.transition = "transform 0.2s ease";
         card.style.transform = "translateX(0)";
-        wrapper.classList.remove("swiped");
-        if (openWrapper === wrapper) openWrapper = null;
+        zone.style.background = "var(--danger)";
       }
+      _swipeJustClosed = true;
+      setTimeout(() => _swipeJustClosed = false, 300);
     });
   });
 }
@@ -1165,7 +1419,10 @@ function initSwipe() {
 async function restore(id) {
   deletedIds.delete(id);
   saveLocalDeleted(deletedIds);
-  render();
+  cardsNeedRefresh = true; // モーダルを閉じる際に一覧を再描画
+  updateYearMonthSelects();
+  updateTrashBadge();
+  updateHeader();
   renderTrashModal();
   if (getDeleted().length === 0) closeTrash();
   showToast("記事を復元しました");
@@ -1177,24 +1434,16 @@ function updateHeader() {
   const filtered = getFiltered();
   const total    = filtered.length;
   const sel      = selectedIds.size;
-  const allTotal = allArticles.filter(a => !deletedIds.has(a.id) && !aiExcludedIds.has(a.id)).length;
 
-  document.getElementById("stats").textContent = sel > 0 ? `${sel}件選択中` : "";
+  // 選択モードヘッダー
+  document.getElementById("selectStatus").textContent =
+    sel > 0 ? `${sel}件選択中` : "選択してください";
+  const btnTrash = document.getElementById("btnTrashSelect");
+  btnTrash.disabled = sel === 0;
+  btnTrash.classList.toggle("active", sel > 0);
 
-  // カウントバッジ
-  const badge = document.getElementById("countBadge");
-  if (badge) {
-    const hasFilter = activeCat !== "全て" || activeYear !== "全て" ||
-                      activeMonth !== "全て" || searchQuery;
-    badge.textContent = hasFilter ? `${total}件 / 全${allTotal}件` : `${total}件`;
-  }
-
-  const btnDel = document.getElementById("btnDelete");
-  btnDel.disabled    = sel === 0;
-  btnDel.textContent = sel > 0 ? `🗑 ${sel}件を削除` : "削除";
-
-  const allSel = total > 0 && filtered.every(a => selectedIds.has(a.id));
-  document.getElementById("btnSelectAll").textContent = allSel ? "選択解除" : "全選択";
+  // 選択モードフィルター行
+  document.getElementById("selectCountText").textContent = `全${total}件`;
 
   document.querySelectorAll(".chip[data-cat]").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.cat === activeCat);
@@ -1266,19 +1515,17 @@ function renderCards() {
     const cards = byDate[date].map(a => {
       const col = catColor(a.cat);
       const sel = selectedIds.has(a.id);
-      return `<div class="swipe-wrapper">
-      <button class="swipe-del-btn swipe-del-left" onclick="swipeDeleteCard('${a.id}',event)">
-        <span style="font-size:18px">🗑</span><span>削除</span>
-      </button>
-      <button class="swipe-del-btn swipe-del-right" onclick="swipeDeleteCard('${a.id}',event)">
-        <span style="font-size:18px">🗑</span><span>削除</span>
-      </button>
-      <div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="toggleSelect('${a.id}',event)">
+      return `<div class="swipe-wrapper" data-id="${a.id}">
+      <div class="swipe-del-zone">
+        <div class="swipe-del-label"><span>🗑</span><span>削除</span></div>
+        <div class="swipe-del-label"><span>🗑</span><span>削除</span></div>
+      </div>
+      <div class="card${sel ? " selected" : ""}" id="card-${a.id}" onclick="onCardTap('${a.id}',event)">
         <div class="card-bar" style="background:${col}"></div>
         <div class="card-inner">
         <div class="card-check">
           <div class="checkbox">
-            <svg class="checkbox-icon" width="13" height="10" viewBox="0 0 13 10" fill="none">
+            <svg class="checkbox-icon" width="9" height="7" viewBox="0 0 13 10" fill="none">
               <polyline points="1.5,5 5,8.5 11.5,1.5" stroke="white" stroke-width="2.2"
                         stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -1288,16 +1535,9 @@ function renderCards() {
           <div class="card-meta">
             <span class="cat-badge" style="background:${col}22;color:${col}">${catShort(a.cat)}</span>
             <span class="date-badge">${toShortDate(a.date)}</span>
-            <span class="source-name">${escHtml(a.src)}</span>
           </div>
           <div class="card-title">${escHtml(a.title)}</div>
           <div class="card-desc">${escHtml(a.desc || "")}</div>
-          <div class="card-actions">
-            <a class="card-url" href="${escHtml(a.url)}" target="_blank" rel="noopener"
-               onclick="event.stopPropagation()">🔗 ${getDomain(a.url)}</a>
-            <button class="wayback-btn" title="Webアーカイブで開く"
-                    onclick="openWayback('${escHtml(a.url)}',event)">📦</button>
-          </div>
         </div>
         </div>
       </div>
@@ -1308,12 +1548,12 @@ function renderCards() {
   initSwipe();
 }
 
-// ===== ゴミ箱フローティングボタン更新 =====
-function updateTrashFab() {
-  const n   = getDeleted().length;
-  const fab = document.getElementById("trashFab");
-  fab.classList.toggle("visible", n > 0);
-  document.getElementById("trashCount").textContent = n;
+// ===== 削除済みバッジ更新 =====
+function updateTrashBadge() {
+  const n     = getDeleted().length;
+  const badge = document.getElementById("trashCount");
+  badge.classList.toggle("hidden", n === 0);
+  badge.textContent = n;
 }
 
 // ===== ゴミ箱モーダル描画 =====
@@ -1333,8 +1573,21 @@ function renderTrashModal() {
 }
 
 function openTrash()             { renderTrashModal(); document.getElementById("trashBackdrop").classList.add("open"); document.body.style.overflow = "hidden"; }
-function closeTrash()            { document.getElementById("trashBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeTrash() {
+  document.getElementById("trashBackdrop").classList.remove("open");
+  document.body.style.overflow = "";
+  if (cardsNeedRefresh) {
+    renderCards();
+    cardsNeedRefresh = false;
+  }
+}
 function closeTrashOnBackdrop(e) { if (e.target === document.getElementById("trashBackdrop")) closeTrash(); }
+function toggleTrashSort() {
+  trashSortMode = trashSortMode === "deleted" ? "article" : "deleted";
+  document.getElementById("trashSortBtn").textContent =
+    trashSortMode === "deleted" ? "削除した日付順" : "記事の日付順";
+  renderTrashModal();
+}
 
 // ===== フィードバックモーダル =====
 function openFeedback() {
@@ -1361,6 +1614,60 @@ function openSettings() {
 }
 function closeSettings()            { document.getElementById("settingsBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
 function closeSettingsOnBackdrop(e) { if (e.target === document.getElementById("settingsBackdrop")) closeSettings(); }
+
+// ===== 確認状況カレンダー =====
+function openCalendar() {
+  if (calYear === undefined) {
+    const t = new Date();
+    calYear  = t.getFullYear();
+    calMonth = t.getMonth();
+  }
+  renderCalendar();
+  document.getElementById("calendarBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeCalendar()            { document.getElementById("calendarBackdrop").classList.remove("open"); document.body.style.overflow = ""; }
+function closeCalendarOnBackdrop(e) { if (e.target === document.getElementById("calendarBackdrop")) closeCalendar(); }
+
+function shiftCalendarMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById("calendarTitle").textContent = `${calYear}年${calMonth + 1}月`;
+
+  const articleDates = new Set(allArticles.map(a => a.date));
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  const firstDay  = new Date(calYear, calMonth, 1).getDay();
+  const lastDate  = new Date(calYear, calMonth + 1, 0).getDate();
+
+  // 6週分(42マス)で固定し、月をまたいでもカレンダーの大きさが変わらないようにする
+  const totalCells = 42;
+  let cells = "";
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-day no-data"></div>`;
+  for (let d = 1; d <= lastDate; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const hasArticles = articleDates.has(dateStr);
+    let cls = "cal-day";
+    if (!hasArticles) cls += " no-data";
+    else {
+      cls += " has-articles";
+      cls += reviewedDates.has(dateStr) ? " reviewed" : " pending";
+    }
+    if (dateStr === todayStr) cls += " today";
+    const mark = hasArticles ? (reviewedDates.has(dateStr) ? "✓" : "●") : "";
+    const onclick = hasArticles ? ` onclick="toggleReviewed('${dateStr}')"` : "";
+    cells += `<div class="${cls}"${onclick}>${d}<span class="cal-day-mark">${mark}</span></div>`;
+  }
+  for (let i = firstDay + lastDate; i < totalCells; i++) cells += `<div class="cal-day no-data"></div>`;
+
+  document.getElementById("calendarGrid").innerHTML = cells;
+}
 
 function updatePatStatus() {
   const el  = document.getElementById("patStatus");
@@ -1395,7 +1702,7 @@ function clearPATUI() {
 function render() {
   updateYearMonthSelects();
   renderCards();
-  updateTrashFab();
+  updateTrashBadge();
   updateHeader();
 }
 
