@@ -139,7 +139,6 @@ body {
 }
 .chip.active { background: var(--chip-active-bg); color: var(--chip-active-txt); }
 .chip:hover:not(.active) { opacity: 0.75; }
-.chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
 /* ===== フィルター行（年/月/検索/選択/ソート） ===== */
 .search-row {
@@ -163,11 +162,11 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 28px; border-radius: 8px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.4); font-size: 14px; cursor: pointer;
+  color: var(--text-primary); font-size: 14px; cursor: pointer;
   font-family: inherit; flex-shrink: 0; transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.icon-square-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.16); }
+.icon-square-btn:hover { border-color: rgba(255,255,255,0.16); }
 
 .sort-btn {
   padding: 5px 10px; border-radius: 8px;
@@ -603,13 +602,13 @@ body.select-mode .card-check { visibility: visible; }
   </div>
   <div class="filter-bar" id="filterBar">
     <button class="chip active" data-cat="全て"                    onclick="setCategory('全て')">全て</button>
-    <button class="chip" data-cat="政治"                           onclick="setCategory('政治')"><span class="chip-dot" style="background:#ff6655"></span>政治</button>
-    <button class="chip" data-cat="経済"                           onclick="setCategory('経済')"><span class="chip-dot" style="background:#5b9fff"></span>経済</button>
-    <button class="chip" data-cat="社会"                           onclick="setCategory('社会')"><span class="chip-dot" style="background:#3dcc88"></span>社会</button>
-    <button class="chip" data-cat="国際"                           onclick="setCategory('国際')"><span class="chip-dot" style="background:#b077ff"></span>国際</button>
-    <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')"><span class="chip-dot" style="background:#ff9944"></span>スポーツ</button>
-    <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')"><span class="chip-dot" style="background:#ff70a6"></span>芸能・エンタメ・ゴシップ</button>
-    <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')"><span class="chip-dot" style="background:#11ddcc"></span>テクノロジー</button>
+    <button class="chip" data-cat="政治"                           onclick="setCategory('政治')">政治</button>
+    <button class="chip" data-cat="経済"                           onclick="setCategory('経済')">経済</button>
+    <button class="chip" data-cat="社会"                           onclick="setCategory('社会')">社会</button>
+    <button class="chip" data-cat="国際"                           onclick="setCategory('国際')">国際</button>
+    <button class="chip" data-cat="スポーツ"                       onclick="setCategory('スポーツ')">スポーツ</button>
+    <button class="chip" data-cat="芸能・エンタメ・ゴシップ"       onclick="setCategory('芸能・エンタメ・ゴシップ')">芸能</button>
+    <button class="chip" data-cat="テクノロジー"                   onclick="setCategory('テクノロジー')">テック</button>
   </div>
   <div class="search-row" id="searchRow">
     <select class="search-select" id="yearSelect" onchange="setYear(this.value)">
