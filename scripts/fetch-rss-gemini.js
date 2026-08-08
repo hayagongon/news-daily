@@ -1,6 +1,7 @@
 /**
  * fetch-rss-gemini.js
- * Gemini API (gemini-2.5-flash) を使用した RSS 取得およびフィルタリングテスト用スクリプト
+ * Gemini API (gemini-2.5-flash) を使用した RSS 取得およびフィルタリング用スクリプト
+ * ※過去記事の自動削除を廃止し、全件保持する仕様
  */
 
 const https  = require("https");
@@ -13,8 +14,8 @@ const crypto = require("crypto");
 const ROOT_DIR          = path.join(__dirname, "..");
 const DATA_FILE         = path.join(ROOT_DIR, "rss-articles.json");
 const EXCLUDED_FILE     = path.join(ROOT_DIR, "ai-excluded-ids.json");
+const DELETED_FILE      = path.join(ROOT_DIR, "deleted-ids.json");
 const RULES_FILE        = path.join(ROOT_DIR, "filter-rules.txt");
-const KEEP_DAYS         = 30;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY || "";
 
 const SOURCES = [
@@ -134,11 +135,6 @@ function makeId(url, date) {
   return `${date}-${hash}`;
 }
 
-function getCutoffDate() {
-  const d = new Date(Date.now() + 9 * 3600 * 1000 - KEEP_DAYS * 86400 * 1000);
-  return d.toISOString().slice(0, 10);
-}
-
 // ===== Gemini API POST =====
 function geminiPost(prompt) {
   return new Promise((resolve, reject) => {
@@ -170,6 +166,7 @@ function geminiPost(prompt) {
       });
     });
     req.on("error", reject);
+    req.timeout = 60000;
     req.on("timeout", () => { req.destroy(); reject(new Error("Gemini API Timeout")); });
     req.write(body);
     req.end();
@@ -213,7 +210,7 @@ ${JSON.stringify(articleList)}
 }
 
 async function main() {
-  console.log("\n📰 Gemini RSS 取得開始");
+  console.log("\n📰 Gemini RSS 取得開始 (全件保持モード)");
   console.log(`  実行時刻 (JST): ${new Date(Date.now() + 9*3600*1000).toISOString().replace("T"," ").slice(0,19)}`);
 
   let existing = [];
@@ -231,9 +228,14 @@ async function main() {
     try { aiExcludedIds = JSON.parse(fs.readFileSync(EXCLUDED_FILE, "utf8")); } catch (_) {}
   }
 
-  const existingUrls = new Set(existing.map(a => a.url));
-  const cutoff       = getCutoffDate();
-  const newArticles  = [];
+  let deletedIds = [];
+  if (fs.existsSync(DELETED_FILE)) {
+    try { deletedIds = JSON.parse(fs.readFileSync(DELETED_FILE, "utf8")); } catch (_) {}
+  }
+
+  const existingUrls   = new Set(existing.map(a => a.url));
+  const deletedIdsSet  = new Set(deletedIds);
+  const newArticles    = [];
 
   for (const source of SOURCES) {
     try {
@@ -241,10 +243,13 @@ async function main() {
       const items = parseRSS(xml);
       for (const item of items) {
         const date = toDateStr(item.pubDate);
-        if (date < cutoff || existingUrls.has(item.link)) continue;
+        const id   = makeId(item.link, date);
+
+        // すでに登録済み、または手動削除済みの場合はスキップ
+        if (existingUrls.has(item.link) || deletedIdsSet.has(id)) continue;
 
         newArticles.push({
-          id:    makeId(item.link, date),
+          id:    id,
           cat:   source.cat,
           date:  date,
           src:   source.src,
@@ -264,11 +269,11 @@ async function main() {
 
   fs.writeFileSync(EXCLUDED_FILE, JSON.stringify([...allExcluded], null, 2), "utf8");
 
-  const survived = existing.filter(a => (a.date || "") >= cutoff);
-  const merged   = [...newArticles, ...survived].sort((a, b) => b.date.localeCompare(a.date));
+  // 過去記事の自動削除（日付カットオフ）を行わず全件マージ
+  const merged = [...newArticles, ...existing].sort((a, b) => b.date.localeCompare(a.date));
 
   fs.writeFileSync(DATA_FILE, JSON.stringify(merged, null, 2), "utf8");
-  console.log(`✅ Gemini テスト処理完了: 新規 ${newArticles.length} 件 / AI除外 ${newExcludedIds.length} 件`);
+  console.log(`✅ 処理完了: 新規 ${newArticles.length} 件追加 / 全保存総数 ${merged.length} 件 / AI除外 ${newExcludedIds.length} 件`);
 }
 
 main().catch(console.error);
