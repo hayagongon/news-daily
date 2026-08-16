@@ -1,7 +1,7 @@
 /**
  * fetch-rss-gemini.js
- * Gemini API (gemini-2.5-flash) を使用した RSS 取得およびフィルタリング用スクリプト
- * ※過去記事の自動削除を廃止し、全件保持する仕様
+ * Gemini API (gemini-1.5-flash) を使用した RSS 取得およびフィルタリング用スクリプト
+ * ※全件保持モード（自動削除なし）
  */
 
 const https  = require("https");
@@ -37,7 +37,7 @@ function fetchUrl(url, redirects = 0) {
     const mod = url.startsWith("https") ? https : http;
     const req = mod.get(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; news-daily-bot/1.0)",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept":     "application/rss+xml, application/xml, text/xml, */*",
       },
       timeout: 15000,
@@ -138,7 +138,7 @@ function makeId(url, date) {
 // ===== Gemini API POST =====
 function geminiPost(prompt) {
   return new Promise((resolve, reject) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json" }
@@ -197,14 +197,13 @@ ${JSON.stringify(articleList)}
 ["id1", "id2"] の形式でJSON配列のみを出力してください。該当がない場合は [] を返してください。`;
 
   console.log(`  Gemini API 呼び出し中（${newArticles.length}件送信）...`);
-  const response = await geminiPost(prompt);
-  const rawText = response.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-  
   try {
+    const response = await geminiPost(prompt);
+    const rawText = response.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
     const excluded = JSON.parse(rawText);
     return Array.isArray(excluded) ? excluded : [];
   } catch (e) {
-    console.log(`  ⚠️ Gemini API パース失敗: ${e.message}`);
+    console.log(`  ⚠️ Gemini フィルタリングスキップ（エラー: ${e.message}）`);
     return [];
   }
 }
@@ -245,7 +244,6 @@ async function main() {
         const date = toDateStr(item.pubDate);
         const id   = makeId(item.link, date);
 
-        // すでに登録済み、または手動削除済みの場合はスキップ
         if (existingUrls.has(item.link) || deletedIdsSet.has(id)) continue;
 
         newArticles.push({
@@ -264,12 +262,20 @@ async function main() {
     }
   }
 
-  const newExcludedIds = await filterWithGemini(newArticles, filterRules);
+  let newExcludedIds = [];
+  try {
+    newExcludedIds = await filterWithGemini(newArticles, filterRules);
+  } catch (e) {
+    console.log(`  ⚠️ フィルタリング例外処理: ${e.message}`);
+  }
+
   const allExcluded = new Set([...aiExcludedIds, ...newExcludedIds]);
 
-  fs.writeFileSync(EXCLUDED_FILE, JSON.stringify([...allExcluded], null, 2), "utf8");
+  try {
+    fs.writeFileSync(EXCLUDED_FILE, JSON.stringify([...allExcluded], null, 2), "utf8");
+  } catch (_) {}
 
-  // 過去記事の自動削除（日付カットオフ）を行わず全件マージ
+  // 全件マージして保存
   const merged = [...newArticles, ...existing].sort((a, b) => b.date.localeCompare(a.date));
 
   fs.writeFileSync(DATA_FILE, JSON.stringify(merged, null, 2), "utf8");
